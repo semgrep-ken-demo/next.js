@@ -1,0 +1,10 @@
+packages/next/src/compiled/
+packages/next/src/bundles/
+turbopack/crates/turbopack-tests/
+turbopack/crates/turbopack-tracing/tests/
+**/node_modules/
+test/
+examples/
+bench/
+docs/
+errors/
