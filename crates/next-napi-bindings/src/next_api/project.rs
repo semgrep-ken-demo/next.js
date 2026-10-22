@@ -462,10 +462,21 @@ pub fn project_new(
                     .join(path)
             }
         } else {
-            PathBuf::from(&options.root_path)
-                .join(&options.project_path)
+            let root = PathBuf::from(&options.root_path);
+            let project_dir = root.join(&options.project_path);
+            let canonical_root = root.canonicalize().unwrap_or_else(|_| root.clone());
+            let canonical_project = project_dir
+                .canonicalize()
+                .unwrap_or_else(|_| project_dir.clone());
+            if !canonical_project.starts_with(&canonical_root) {
+                panic!(
+                    "project_path escapes root_path: {} is not under {}",
+                    canonical_project.display(),
+                    canonical_root.display()
+                );
+            }
+            canonical_project
                 .join(DIST_PROFILES_DIR_NAME)
-                // use a generic binary extension to hint to random tools not to read it.
                 .join("trace-turbopack.bin")
         };
         let trace_dir = trace_file
