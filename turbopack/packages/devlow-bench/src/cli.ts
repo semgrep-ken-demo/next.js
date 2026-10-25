@@ -1,6 +1,6 @@
 import minimist from 'minimist'
 import { setCurrentScenarios } from './describe.js'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { Scenario, ScenarioVariant, runScenarios } from './index.js'
 import compose from './interfaces/compose.js'
 import { groupRows, printComparison } from './compare.js'
@@ -124,8 +124,15 @@ async function runRunSubcommand(argv: string[]): Promise<void> {
   const scenarios: Scenario[] = []
   setCurrentScenarios(scenarios)
 
+  const cwd = process.cwd()
   for (const path of args._) {
-    await import(pathToFileURL(join(process.cwd(), path)).toString())
+    const resolved = resolve(cwd, path)
+    if (!resolved.startsWith(cwd + '/') && resolved !== cwd) {
+      throw new Error(
+        `Scenario path "${path}" resolves outside the working directory`
+      )
+    }
+    await import(pathToFileURL(resolved).toString())
   }
 
   setCurrentScenarios(null)
