@@ -26,7 +26,11 @@ const ABSOLUTE_ROOT = path.resolve(__filename, relativePathToDistRoot)
  */
 function resolveAbsolutePath(modulePath?: string): string {
   if (modulePath) {
-    return path.join(ABSOLUTE_ROOT, modulePath)
+    const resolved = path.join(ABSOLUTE_ROOT, modulePath)
+    if (!resolved.startsWith(ABSOLUTE_ROOT + path.sep) && resolved !== ABSOLUTE_ROOT) {
+      throw new Error(`${modulePath} is not within the project root`)
+    }
+    return resolved
   }
   return ABSOLUTE_ROOT
 }
