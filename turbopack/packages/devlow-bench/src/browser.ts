@@ -176,7 +176,7 @@ function networkIdle(
       console.error(
         `Timeout while waiting for network idle. These requests are still pending: ${Array.from(
           requests
-        ).join(', ')}} time is ${lastRequest - start}`
+        ).join(', ').replace(/[\r\n]/g, '')}} time is ${lastRequest - start}`
       )
       resolve(Date.now() - lastRequest)
     }, timeoutMs)
@@ -209,7 +209,7 @@ function networkIdle(
       const currentCount = requests.get(request.url())
       if (currentCount === undefined) {
         console.error(
-          `Unexpected untracked but completed request ${request.url()}`
+          `Unexpected untracked but completed request ${request.url().replace(/[\r\n]/g, '')}`
         )
         return
       }
