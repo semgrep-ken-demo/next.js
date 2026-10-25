@@ -34,6 +34,12 @@ fn decide_early(remaining: usize, min_remaining_decisions: usize) -> bool {
 }
 
 fn write_file<P: AsRef<Path>>(name: &str, path: P, content: &[u8]) -> Result<()> {
+    let path = path.as_ref();
+    for component in path.components() {
+        if matches!(component, std::path::Component::ParentDir) {
+            bail!("path contains disallowed \"..\" component in {name}: {}", path.display());
+        }
+    }
     File::create(path)
         .with_context(|| format!("creating {name}"))?
         .write_all(content)
