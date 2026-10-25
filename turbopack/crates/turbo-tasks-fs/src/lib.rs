@@ -2110,8 +2110,11 @@ pub enum PersistedFileContent {
 impl PersistedFileContent {
     /// Performs a comparison of self's data against a disk file's streamed read.
     async fn streaming_compare(&self, path: &Path) -> Result<FileComparison> {
+        let path = path
+            .normalize_lexically()
+            .with_context(|| format!("invalid path: {}", path.display()))?;
         let old_file =
-            extract_disk_access(retry_blocking(|| std::fs::File::open(path)).await, path)?;
+            extract_disk_access(retry_blocking(|| std::fs::File::open(&path)).await, &path)?;
         let Some(old_file) = old_file else {
             return Ok(match self {
                 PersistedFileContent::NotFound => FileComparison::Equal,
@@ -2123,7 +2126,7 @@ impl PersistedFileContent {
             return Ok(FileComparison::NotEqual);
         };
 
-        let old_meta = extract_disk_access(retry_blocking(|| old_file.metadata()).await, path)?;
+        let old_meta = extract_disk_access(retry_blocking(|| old_file.metadata()).await, &path)?;
         let Some(old_meta) = old_meta else {
             // If we failed to get meta, then the old file has been deleted between the
             // handle open. In which case, we just pretend the file never existed.
