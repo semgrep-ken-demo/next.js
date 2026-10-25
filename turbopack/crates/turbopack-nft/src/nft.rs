@@ -41,7 +41,7 @@ pub async fn node_file_trace(
     if show_issues {
         let issue_reporter: Vc<Box<dyn IssueReporter>> =
             Vc::upcast(ConsoleUi::new(TransientInstance::new(LogOptions {
-                project_dir: PathBuf::from(project_root),
+                project_dir: PathBuf::from(project_root).canonicalize()?,
                 current_dir: current_dir().unwrap(),
                 show_all: true,
                 log_detail: false,
