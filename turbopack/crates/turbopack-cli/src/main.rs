@@ -93,6 +93,10 @@ async fn main_inner(args: Arguments) -> Result<()> {
         std::fs::create_dir_all(&internal_dir)
             .context("Unable to create .turbopack directory")
             .unwrap();
+        let internal_dir = internal_dir
+            .canonicalize()
+            .context("Unable to resolve .turbopack directory")
+            .unwrap();
         let trace_file = internal_dir.join("trace.log");
         let trace_writer = std::fs::File::create(trace_file).unwrap();
         let (trace_writer, guard) = TraceWriter::new(trace_writer);
