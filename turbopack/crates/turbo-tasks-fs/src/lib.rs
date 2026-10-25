@@ -1020,6 +1020,13 @@ impl FileSystem for DiskFileSystem {
             ) -> anyhow::Result<()> {
                 let full_path = validate_path_length(&self.full_path)?;
 
+                let root_path = self.inner.root_path();
+                if !full_path.starts_with(root_path) {
+                    anyhow::bail!(
+                        "path {full_path:?} escapes filesystem root {root_path:?}"
+                    );
+                }
+
                 let _lock = self.inner.lock_path(&full_path).await;
 
                 // We perform an untracked comparison here, so that this write is not dependent
@@ -1234,6 +1241,13 @@ impl FileSystem for DiskFileSystem {
         impl CapturedWriteLinkEffect {
             async fn apply_inner(&self, content: &ReadRef<LinkContent>) -> anyhow::Result<()> {
                 let full_path = validate_path_length(&self.full_path)?;
+
+                let root_path = self.inner.root_path();
+                if !full_path.starts_with(root_path) {
+                    anyhow::bail!(
+                        "path {full_path:?} escapes filesystem root {root_path:?}"
+                    );
+                }
 
                 let _lock = self.inner.lock_path(&full_path).await;
 
