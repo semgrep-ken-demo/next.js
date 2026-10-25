@@ -842,6 +842,10 @@ fn main() -> Result<()> {
         }
     };
 
+    let db_path = db_path
+        .canonicalize()
+        .with_context(|| format!("Failed to resolve path: {}", db_path.display()))?;
+
     if !db_path.is_dir() {
         bail!("Not a directory: {}", db_path.display());
     }
