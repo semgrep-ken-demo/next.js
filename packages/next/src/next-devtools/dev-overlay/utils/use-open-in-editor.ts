@@ -27,7 +27,10 @@ export function useOpenInEditor({
         () => {},
         (cause) => {
           console.error(
-            `Failed to open file "${file} (${line1}:${column1})" in your editor. Cause:`,
+            'Failed to open file "%s (%s:%s)" in your editor. Cause:',
+            file,
+            line1,
+            column1,
             cause
           )
         }
