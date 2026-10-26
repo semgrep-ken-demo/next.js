@@ -12,6 +12,8 @@ export function buildDataRoute(page: string, buildId: string) {
   let dataRouteRegex: string
   let namedDataRouteRegex: string | undefined
   let routeKeys: { [named: string]: string } | undefined
+  let dataRouteRe: RegExp
+  let i18nDataRouteRe: RegExp
 
   if (isDynamicRoute(page)) {
     const routeRegex = getNamedRouteRegex(dataRoute, {
@@ -23,16 +25,25 @@ export function buildDataRoute(page: string, buildId: string) {
     dataRouteRegex = normalizeRouteRegex(routeRegex.re.source)
     namedDataRouteRegex = routeRegex.namedRegex
     routeKeys = routeRegex.routeKeys
-  } else {
-    dataRouteRegex = normalizeRouteRegex(
-      new RegExp(
-        `^${path.posix.join(
-          '/_next/data',
-          escapeStringRegexp(buildId),
-          `${pagePath}\\.json`
-        )}$`
-      ).source
+    dataRouteRe = routeRegex.re
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+    i18nDataRouteRe = new RegExp(
+      routeRegex.re.source.replace(
+        `/${escapeStringRegexp(buildId)}/`,
+        `/${escapeStringRegexp(buildId)}/(?<nextLocale>[^/]+?)/`
+      )
     )
+  } else {
+    const dataPrefix = path.posix.join('/_next/data', escapeStringRegexp(buildId))
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+    dataRouteRe = new RegExp(
+      `^${dataPrefix}/${pagePath}\\.json$`
+    )
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+    i18nDataRouteRe = new RegExp(
+      `^${dataPrefix}/(?<nextLocale>[^/]+?)/${pagePath}\\.json$`
+    )
+    dataRouteRegex = normalizeRouteRegex(dataRouteRe.source)
   }
 
   return {
@@ -40,5 +51,7 @@ export function buildDataRoute(page: string, buildId: string) {
     routeKeys,
     dataRouteRegex,
     namedDataRouteRegex,
+    dataRouteRe,
+    i18nDataRouteRe,
   }
 }

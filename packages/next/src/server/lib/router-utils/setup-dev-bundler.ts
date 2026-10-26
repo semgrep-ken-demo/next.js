@@ -1065,13 +1065,8 @@ async function startWatcher(
               // TODO: fix this in the manifest itself, must also be fixed in
               // upstream builder that relies on this
               re: opts.nextConfig.i18n
-                ? new RegExp(
-                    route.dataRouteRegex.replace(
-                      `/development/`,
-                      `/development/(?<nextLocale>[^/]+?)/`
-                    )
-                  )
-                : new RegExp(route.dataRouteRegex),
+                ? route.i18nDataRouteRe
+                : route.dataRouteRe,
               groups: routeRegex.groups,
             }),
           })
