@@ -667,10 +667,15 @@ export default class DevServer extends Server {
   }
 
   protected getinterceptionRoutePatterns(): RegExp[] {
-    const rewrites = generateInterceptionRoutesRewrites(
+    const routes = generateInterceptionRoutesRewrites(
       Object.keys(this.appPathRoutes ?? {}),
       this.nextConfig.basePath
-    ).map((route) => new RegExp(buildCustomRoute('rewrite', route).regex))
+    )
+    const rewrites: RegExp[] = []
+    for (const route of routes) {
+      const { regex } = buildCustomRoute('rewrite', route)
+      rewrites.push(new RegExp(regex))
+    }
 
     if (this.nextConfig.output === 'export' && rewrites.length > 0) {
       Log.error(
