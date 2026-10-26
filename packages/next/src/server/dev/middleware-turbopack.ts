@@ -401,11 +401,12 @@ export function getOverlayMiddleware({
       let openEditorResult
       if (isAppRelativePath) {
         const relativeFilePath = searchParams.get('file') || ''
-        const appPath = path.join(
-          'app',
-          isSrcDir ? 'src' : '',
-          relativeFilePath
-        )
+        const appBase = path.join('app', isSrcDir ? 'src' : '')
+        const appPath = path.join(appBase, relativeFilePath)
+        const rel = path.relative(appBase, appPath)
+        if (rel === '..' || rel.startsWith('..' + path.sep)) {
+          return middlewareResponse.badRequest(res)
+        }
         openEditorResult = await openFileInEditor(appPath, 1, 1, projectPath)
       } else {
         const frame = createStackFrame(searchParams)
