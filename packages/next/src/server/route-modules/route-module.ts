@@ -100,6 +100,18 @@ const dynamicImportEsmDefault = (id: string) =>
     (mod) => mod.default || mod
   )
 
+function compileManifestRouteRegex(pattern: unknown): RegExp | null {
+  if (typeof pattern !== 'string' || pattern.length === 0) {
+    return null
+  }
+  try {
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+    return new RegExp(pattern)
+  } catch {
+    return null
+  }
+}
+
 /**
  * RouteModule is the base class for all route modules. This class should be
  * extended by all route modules.
@@ -272,7 +284,9 @@ export abstract class RouteModule<
         prefetchHintsManifest: undefined,
         interceptionRoutePatterns: (
           maybeJSONParse(self.__INTERCEPTION_ROUTE_REWRITE_MANIFEST) ?? []
-        ).map((rewrite: any) => new RegExp(rewrite.regex)),
+        )
+          .map((rewrite: any) => compileManifestRouteRegex(rewrite.regex))
+          .filter((re: RegExp | null): re is RegExp => re !== null),
       }
     } else {
       if (!projectDir) {
@@ -423,7 +437,8 @@ export abstract class RouteModule<
         prefetchHintsManifest,
         interceptionRoutePatterns: routesManifest.rewrites.beforeFiles
           .filter(isInterceptionRouteRewrite)
-          .map((rewrite) => new RegExp(rewrite.regex)),
+          .map((rewrite) => compileManifestRouteRegex(rewrite.regex))
+          .filter((re): re is RegExp => re !== null),
       }
     }
 
