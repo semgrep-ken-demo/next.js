@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync } from 'fs'
-import path, { join } from 'path'
+import path from 'path'
 import { mkdir } from 'fs/promises'
 
 import loadConfig from '../server/config'
@@ -21,6 +21,14 @@ import { writeCacheLifeTypes } from '../server/lib/router-utils/cache-life-type-
 import { writeRootParamsTypes } from '../server/lib/router-utils/root-params-type-utils'
 import { installBindings } from '../build/swc/install-bindings'
 
+function safeJoin(base: string, ...segments: string[]): string {
+  const resolved = path.resolve(base, ...segments)
+  if (!resolved.startsWith(path.resolve(base) + path.sep) && resolved !== path.resolve(base)) {
+    throw new Error(`Path traversal detected: ${resolved} escapes base ${base}`)
+  }
+  return resolved
+}
+
 export type NextTypegenOptions = {
   dir?: string
 }
@@ -38,7 +46,7 @@ const nextTypegen = async (
 
   const nextConfig = await loadConfig(PHASE_PRODUCTION_BUILD, baseDir)
   await installBindings(nextConfig.experimental?.useWasmBinary)
-  const distDir = join(baseDir, nextConfig.distDir)
+  const distDir = safeJoin(baseDir, nextConfig.distDir)
   const { pagesDir, appDir } = findPagesDir(baseDir)
 
   const strictRouteTypes = Boolean(nextConfig.experimental.strictRouteTypes)
@@ -59,9 +67,9 @@ const nextTypegen = async (
 
   console.log('Generating route types...')
 
-  const routeTypesFilePath = join(distDir, 'types', 'routes.d.ts')
-  const validatorFilePath = join(distDir, 'types', 'validator.ts')
-  await mkdir(join(distDir, 'types'), { recursive: true })
+  const routeTypesFilePath = safeJoin(distDir, 'types', 'routes.d.ts')
+  const validatorFilePath = safeJoin(distDir, 'types', 'validator.ts')
+  await mkdir(safeJoin(distDir, 'types'), { recursive: true })
 
   const isSrcDir = path
     .relative(baseDir, pagesDir || appDir || '')
@@ -110,12 +118,12 @@ const nextTypegen = async (
   )
 
   // Generate cache-life types if cacheLife config exists
-  const cacheLifeFilePath = join(distDir, 'types', 'cache-life.d.ts')
+  const cacheLifeFilePath = safeJoin(distDir, 'types', 'cache-life.d.ts')
   writeCacheLifeTypes(nextConfig.cacheLife, cacheLifeFilePath)
 
   await writeRootParamsTypes(
     routeTypesManifest,
-    join(distDir, 'types', 'root-params.d.ts')
+    safeJoin(distDir, 'types', 'root-params.d.ts')
   )
 
   console.log('✓ Types generated successfully')
