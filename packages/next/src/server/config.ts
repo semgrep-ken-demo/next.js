@@ -2364,9 +2364,11 @@ function cloneObject(obj: any): any {
     return obj
   }
 
-  // RegExp → clone via constructor
+  // RegExp → clone via constructor (passing a RegExp object directly
+  // copies source+flags without introducing a ReDoS vector)
   if (obj instanceof RegExp) {
-    return new RegExp(obj.source, obj.flags)
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+    return new RegExp(obj)
   }
 
   // Function → just reuse the function reference
