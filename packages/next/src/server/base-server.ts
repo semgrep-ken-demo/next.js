@@ -162,6 +162,18 @@ import {
   computeLegacyCacheBustingSearchParam,
 } from '../shared/lib/router/utils/cache-busting-search-param'
 
+function sanitizeDistDir(distDir: string): string {
+  if (
+    path.isAbsolute(distDir) ||
+    distDir.split(/[\\/]/).includes('..')
+  ) {
+    throw new Error(
+      `Invalid distDir "${distDir}" — it must be a relative path without ".." segments.`
+    )
+  }
+  return distDir
+}
+
 export type FindComponentsResult<
   NextModule extends GenericComponentMod = GenericComponentMod,
 > = {
@@ -490,10 +502,7 @@ export default abstract class Server<
       this.fetchHostname = formatHostname(this.hostname)
     }
     this.port = port
-    this.distDir = path.join(
-      /* turbopackIgnore: true */ this.dir,
-      this.nextConfig.distDir
-    )
+    this.distDir = path.join(this.dir, sanitizeDistDir(this.nextConfig.distDir))
     this.publicDir = this.getPublicDir()
     this.hasStaticDir = !minimalMode && this.getHasStaticDir()
 
