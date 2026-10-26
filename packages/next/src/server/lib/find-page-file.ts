@@ -1,7 +1,7 @@
 import { fileExists } from '../../lib/file-exists'
 import { getPagePaths } from '../../shared/lib/page-path/get-page-paths'
 import { nonNullable } from '../../lib/non-nullable'
-import { join, sep, normalize } from 'path'
+import { join, sep, normalize, isAbsolute } from 'path'
 import { promises as fsPromises } from 'fs'
 import { warn } from '../../build/output/log'
 import { cyan } from '../../lib/picocolors'
@@ -9,8 +9,21 @@ import { isMetadataRouteFile } from '../../lib/metadata/is-metadata-route'
 import { escapeStringRegexp } from '../../shared/lib/escape-regexp'
 import type { PageExtensions } from '../../build/page-extensions-type'
 
+function sanitizePath(unsafePath: string): string {
+  const normalized = normalize(unsafePath)
+  if (isAbsolute(normalized)) {
+    throw new Error(`Absolute path not allowed: ${unsafePath}`)
+  }
+  const segments = normalized.split(sep)
+  if (segments.some((s) => s === '..')) {
+    throw new Error(`Path traversal not allowed: ${unsafePath}`)
+  }
+  return normalized
+}
+
 async function isTrueCasePagePath(pagePath: string, pagesDir: string) {
-  const pageSegments = normalize(pagePath).split(sep).filter(Boolean)
+  const safePath = sanitizePath(pagePath)
+  const pageSegments = safePath.split(sep).filter(Boolean)
   const segmentExistsPromises = pageSegments.map(async (segment, i) => {
     const segmentParentDir = join(pagesDir, ...pageSegments.slice(0, i))
     const parentDirEntries = await fsPromises.readdir(segmentParentDir)
@@ -39,7 +52,8 @@ export async function findPageFile(
   const [existingPath, ...others] = (
     await Promise.all(
       pagePaths.map(async (path) => {
-        const filePath = join(pagesDir, path)
+        const safePath = sanitizePath(path)
+        const filePath = join(pagesDir, safePath)
         try {
           return (await fileExists(filePath)) ? path : null
         } catch (err: any) {
@@ -60,8 +74,8 @@ export async function findPageFile(
 
   if (others.length > 0) {
     warn(
-      `Duplicate page detected. ${cyan(join('pages', existingPath))} and ${cyan(
-        join('pages', others[0])
+      `Duplicate page detected. ${cyan(join('pages', sanitizePath(existingPath)))} and ${cyan(
+        join('pages', sanitizePath(others[0]))
       )} both resolve to ${cyan(normalizedPagePath)}.`
     )
   }
