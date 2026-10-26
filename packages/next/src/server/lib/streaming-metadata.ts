@@ -1,23 +1,30 @@
 import {
   getBotType,
-  HTML_LIMITED_BOT_UA_RE_STRING,
+  HTML_LIMITED_BOT_UA_RE,
 } from '../../shared/lib/router/utils/is-bot'
 import type { BaseNextRequest } from '../base-http'
 
 let cachedPattern: string | undefined
 let cachedRegex: RegExp | undefined
 
+export function getHtmlLimitedBotsRegex(
+  htmlLimitedBots: string | undefined
+): RegExp {
+  if (!htmlLimitedBots) {
+    return HTML_LIMITED_BOT_UA_RE
+  }
+  if (cachedPattern !== htmlLimitedBots) {
+    cachedPattern = htmlLimitedBots
+    cachedRegex = new RegExp(htmlLimitedBots, 'i') // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+  }
+  return cachedRegex!
+}
+
 export function shouldServeStreamingMetadata(
   userAgent: string,
-  htmlLimitedBots: string | undefined
+  htmlLimitedBotsRegex: RegExp
 ): boolean {
-  const pattern = htmlLimitedBots || HTML_LIMITED_BOT_UA_RE_STRING
-  if (cachedPattern !== pattern) {
-    cachedPattern = pattern
-    cachedRegex = new RegExp(pattern, 'i')
-  }
-  // Only block metadata for HTML-limited bots
-  if (userAgent && cachedRegex!.test(userAgent)) {
+  if (userAgent && htmlLimitedBotsRegex.test(userAgent)) {
     return false
   }
   return true

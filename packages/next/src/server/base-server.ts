@@ -142,7 +142,10 @@ import { NextRequestHint } from './web/adapter'
 import type { RouteModule } from './route-modules/route-module'
 import { type FallbackMode, parseFallbackField } from '../lib/fallback'
 import { SegmentPrefixRSCPathnameNormalizer } from './normalizers/request/segment-prefix-rsc'
-import { shouldServeStreamingMetadata } from './lib/streaming-metadata'
+import {
+  getHtmlLimitedBotsRegex,
+  shouldServeStreamingMetadata,
+} from './lib/streaming-metadata'
 import { decodeQueryPathParameter } from './lib/decode-query-path-parameter'
 import { NoFallbackError } from '../shared/lib/no-fallback-error.external'
 import { fixMojibake } from './lib/fix-mojibake'
@@ -325,6 +328,7 @@ export default abstract class Server<
   protected readonly dir: string
   protected readonly quiet: boolean
   protected readonly nextConfig: NextConfigRuntime
+  private readonly htmlLimitedBotsRegex: RegExp
   protected readonly distDir: string
   protected readonly publicDir: string
   protected readonly hasStaticDir: boolean
@@ -463,6 +467,9 @@ export default abstract class Server<
     // TODO: should conf be normalized to prevent missing
     // values from causing issues as this can be user provided
     this.nextConfig = conf as NextConfigRuntime
+    this.htmlLimitedBotsRegex = getHtmlLimitedBotsRegex(
+      this.nextConfig.htmlLimitedBots
+    )
 
     if (this.nextConfig.experimental.runtimeServerDeploymentId) {
       if (!process.env.NEXT_DEPLOYMENT_ID) {
@@ -1795,7 +1802,7 @@ export default abstract class Server<
         supportsDynamicResponse: !this.renderOpts.botType,
         serveStreamingMetadata: shouldServeStreamingMetadata(
           ua,
-          this.nextConfig.htmlLimitedBots
+          this.htmlLimitedBotsRegex
         ),
       },
     }
