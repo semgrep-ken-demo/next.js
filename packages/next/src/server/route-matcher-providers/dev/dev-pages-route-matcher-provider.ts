@@ -23,7 +23,10 @@ export class DevPagesRouteMatcherProvider extends FileCacheRouteMatcherProvider<
 
     // Match any route file that ends with `/${filename}.${extension}` under the
     // pages directory.
-    this.expression = new RegExp(`\\.(?:${extensions.join('|')})$`)
+    const escaped = extensions.map((ext) =>
+      ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    )
+    this.expression = new RegExp(`\\.(?:${escaped.join('|')})$`)
 
     this.normalizers = new DevPagesNormalizers(pagesDir, extensions)
   }
