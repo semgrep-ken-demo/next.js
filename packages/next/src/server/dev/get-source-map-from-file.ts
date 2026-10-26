@@ -26,6 +26,7 @@ export async function getSourceMapFromFile(
   filename = filename.startsWith('file://')
     ? url.fileURLToPath(filename)
     : filename
+  filename = path.normalize(filename)
 
   let fileContents: string
 
@@ -69,9 +70,20 @@ export async function getSourceMapFromFile(
     }
   }
 
+  const decodedSourceUrl = path.normalize(decodeURIComponent(sourceUrl))
+  if (path.isAbsolute(decodedSourceUrl)) {
+    throw new Error(
+      `Refusing to resolve absolute source map path for ${filename}: ${decodedSourceUrl}.`
+    )
+  }
+  if (decodedSourceUrl.split(path.sep).includes('..')) {
+    throw new Error(
+      `Refusing to resolve source map path with directory traversal for ${filename}: ${decodedSourceUrl}.`
+    )
+  }
   const sourceMapFilename = path.resolve(
     path.dirname(filename),
-    decodeURIComponent(sourceUrl)
+    decodedSourceUrl
   )
 
   try {
