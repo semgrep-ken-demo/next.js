@@ -40,6 +40,7 @@ import {
 import { setManifestsSingleton } from '../../server/app-render/manifests-singleton' with { 'turbopack-transition': 'next-server-utility' }
 import {
   isHtmlBotRequest,
+  getHtmlLimitedBotsRegex,
   shouldServeStreamingMetadata,
 } from '../../server/lib/streaming-metadata' with { 'turbopack-transition': 'next-server-utility' }
 import { normalizeAppPath } from '../../shared/lib/router/utils/app-paths' with { 'turbopack-transition': 'next-server-utility' }
@@ -518,7 +519,10 @@ export async function handler(
       ? false
       : !userAgent
         ? true
-        : shouldServeStreamingMetadata(userAgent, nextConfig.htmlLimitedBots)
+        : shouldServeStreamingMetadata(
+            userAgent,
+            getHtmlLimitedBotsRegex(nextConfig.htmlLimitedBots)
+          )
 
   const isSSG = Boolean(
     (prerenderInfo ||
