@@ -29,3 +29,11 @@ export function modifyRouteRegex(regex: string, restrictedPaths?: string[]) {
   regex = regex.replace(/\$$/, '(?:\\/)?$')
   return regex
 }
+
+export function modifyRouteRegexp(
+  regexp: RegExp,
+  restrictedPaths?: string[]
+): RegExp {
+  const modified = modifyRouteRegex(regexp.source, restrictedPaths)
+  return new RegExp(modified, regexp.flags)
+}

@@ -17,7 +17,7 @@ import * as Log from '../../../build/output/log'
 import setupDebug from 'next/dist/compiled/debug'
 import { LRUCache } from '../lru-cache'
 import loadCustomRoutes, { type Rewrite } from '../../../lib/load-custom-routes'
-import { modifyRouteRegex } from '../../../lib/redirect-status'
+import { modifyRouteRegexp } from '../../../lib/redirect-status'
 import { FileType, fileExists } from '../../../lib/file-exists'
 import { recursiveReadDir } from '../../../lib/recursive-readdir'
 import { isDynamicRoute } from '../../../shared/lib/router/utils'
@@ -85,15 +85,16 @@ export const buildCustomRoute = <T>(
   const match = getPathMatch(item.source, {
     strict: true,
     removeUnnamedParams: true,
-    regexModifier: (regex: string) => {
+    regexModifier: (regexp: RegExp) => {
+      let modified = regexp
       if (!(item as any).internal) {
-        regex = modifyRouteRegex(
-          regex,
+        modified = modifyRouteRegexp(
+          regexp,
           type === 'redirect' ? restrictedRedirectPaths : undefined
         )
       }
-      builtRegex = regex
-      return builtRegex
+      builtRegex = modified.source
+      return modified
     },
     sensitive: caseSensitive,
   })
