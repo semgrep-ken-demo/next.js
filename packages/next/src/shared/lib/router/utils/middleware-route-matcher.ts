@@ -14,13 +14,18 @@ export interface MiddlewareRouteMatch {
 export function getMiddlewareRouteMatcher(
   matchers: ProxyMatcher[]
 ): MiddlewareRouteMatch {
+  const compiledMatchers = matchers.map((matcher) => ({
+    ...matcher,
+    regexp: new RegExp(matcher.regexp),
+  }))
+
   return (
     pathname: string | null | undefined,
     req: BaseNextRequest,
     query: Params
   ) => {
-    for (const matcher of matchers) {
-      const routeMatch = new RegExp(matcher.regexp).exec(pathname!)
+    for (const matcher of compiledMatchers) {
+      const routeMatch = matcher.regexp.exec(pathname!)
       if (!routeMatch) {
         continue
       }
