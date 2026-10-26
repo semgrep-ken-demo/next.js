@@ -4,7 +4,6 @@ import type { NextParsedUrlQuery } from '../../../../server/request-meta'
 import type { RouteHas } from '../../../../lib/load-custom-routes'
 import type { BaseNextRequest } from '../../../../server/base-http'
 
-import { escapeStringRegexp } from '../../escape-regexp'
 import { parseUrl, type ParsedUrl } from './parse-url'
 import {
   INTERCEPTION_ROUTE_MARKERS,
@@ -35,10 +34,41 @@ function getSafeParamName(paramName: string) {
 }
 
 function escapeSegment(str: string, segmentName: string) {
-  return str.replace(
-    new RegExp(`:${escapeStringRegexp(segmentName)}`, 'g'),
-    `__ESC_COLON_${segmentName}`
+  return str.replaceAll(`:${segmentName}`, `__ESC_COLON_${segmentName}`)
+}
+
+function isWordChar(c: number): boolean {
+  return (
+    (c >= 48 && c <= 57) || // 0-9
+    (c >= 65 && c <= 90) || // A-Z
+    (c >= 97 && c <= 122) || // a-z
+    c === 95 // _
   )
+}
+
+function replaceNotFollowedByWord(
+  str: string,
+  search: string,
+  replacement: string
+): string {
+  let result = ''
+  let i = 0
+  while (i < str.length) {
+    const idx = str.indexOf(search, i)
+    if (idx === -1) {
+      result += str.slice(i)
+      break
+    }
+    result += str.slice(i, idx)
+    const afterIdx = idx + search.length
+    if (afterIdx < str.length && isWordChar(str.charCodeAt(afterIdx))) {
+      result += search
+    } else {
+      result += replacement
+    }
+    i = afterIdx
+  }
+  return result
 }
 
 function unescapeSegments(str: string) {
@@ -93,10 +123,10 @@ export function matchHas(
       params[getSafeParamName(key!)] = value
       return true
     } else if (value) {
-      const matcher = new RegExp(`^${hasItem.value}$`)
+      const pattern = `^${hasItem.value}$`
       const matches = Array.isArray(value)
-        ? value.slice(-1)[0].match(matcher)
-        : value.match(matcher)
+        ? value.slice(-1)[0].match(pattern)
+        : value.match(pattern)
 
       if (matches) {
         if (Array.isArray(matches)) {
@@ -132,19 +162,10 @@ export function compileNonPath(value: string, params: Params): string {
   for (const key of Object.keys(params)) {
     if (value.includes(`:${key}`)) {
       value = value
-        .replace(
-          new RegExp(`:${key}\\*`, 'g'),
-          `:${key}--ESCAPED_PARAM_ASTERISKS`
-        )
-        .replace(
-          new RegExp(`:${key}\\?`, 'g'),
-          `:${key}--ESCAPED_PARAM_QUESTION`
-        )
-        .replace(new RegExp(`:${key}\\+`, 'g'), `:${key}--ESCAPED_PARAM_PLUS`)
-        .replace(
-          new RegExp(`:${key}(?!\\w)`, 'g'),
-          `--ESCAPED_PARAM_COLON${key}`
-        )
+        .replaceAll(`:${key}*`, `:${key}--ESCAPED_PARAM_ASTERISKS`)
+        .replaceAll(`:${key}?`, `:${key}--ESCAPED_PARAM_QUESTION`)
+        .replaceAll(`:${key}+`, `:${key}--ESCAPED_PARAM_PLUS`)
+      value = replaceNotFollowedByWord(value, `:${key}`, `--ESCAPED_PARAM_COLON${key}`)
     }
   }
   value = value
