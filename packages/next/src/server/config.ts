@@ -57,6 +57,18 @@ import type { MemoryEvictionMode } from '../build/swc/types'
 export { normalizeConfig } from './config-shared'
 export type { DomainLocale, NextConfig } from './config-shared'
 
+function sanitizeConfigPath(value: string, configKey: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`Expected a string for ${configKey}, got ${typeof value}`)
+  }
+  if (value.includes('\0')) {
+    throw new Error(
+      `Invalid ${configKey}: path must not contain null bytes`
+    )
+  }
+  return value
+}
+
 function normalizeNextConfigZodErrors(
   error: ZodError<NextConfig>
 ): [warnings: string[], fatalErrors: string[]] {
@@ -776,7 +788,16 @@ function assignDefaultsAndValidate(
           `Specified images.loader property (${images.loader}) cannot be used with images.loaderFile property. Please set images.loader to "custom".`
         )
       }
-      const absolutePath = join(dir, images.loaderFile)
+      const sanitizedLoaderFile = sanitizeConfigPath(
+        images.loaderFile,
+        'images.loaderFile'
+      )
+      const absolutePath = join(dir, sanitizedLoaderFile)
+      if (!absolutePath.startsWith(dir + '/') && absolutePath !== dir) {
+        throw new Error(
+          `Specified images.loaderFile must resolve to a path within the project directory, got "${absolutePath}".`
+        )
+      }
       if (!existsSync(absolutePath)) {
         throw new Error(
           `Specified images.loaderFile does not exist at "${absolutePath}".`
@@ -1088,7 +1109,12 @@ function assignDefaultsAndValidate(
     result?.outputFileTracingRoot &&
     !isAbsolute(result.outputFileTracingRoot)
   ) {
-    result.outputFileTracingRoot = resolve(result.outputFileTracingRoot)
+    result.outputFileTracingRoot = resolve(
+      sanitizeConfigPath(
+        result.outputFileTracingRoot,
+        'outputFileTracingRoot'
+      )
+    )
     if (!silent) {
       Log.warn(
         `outputFileTracingRoot should be absolute, using: ${result.outputFileTracingRoot}`
@@ -1097,7 +1123,9 @@ function assignDefaultsAndValidate(
   }
 
   if (result?.turbopack?.root && !isAbsolute(result.turbopack.root)) {
-    result.turbopack.root = resolve(result.turbopack.root)
+    result.turbopack.root = resolve(
+      sanitizeConfigPath(result.turbopack.root, 'turbopack.root')
+    )
     if (!silent) {
       Log.warn(
         `turbopack.root should be absolute, using: ${result.turbopack.root}`
@@ -1618,7 +1646,10 @@ function assignDefaultsAndValidate(
   ;(result as NextConfigComplete).distDirRoot = result.distDir
 
   if (phase === PHASE_DEVELOPMENT_SERVER) {
-    result.distDir = join(result.distDir, 'dev')
+    result.distDir = join(
+      sanitizeConfigPath(result.distDir, 'distDir'),
+      'dev'
+    )
   }
 
   // Derive the `'use cache'` fill timeout from `staticPageGenerationTimeout`
