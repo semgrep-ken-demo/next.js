@@ -102,6 +102,20 @@ const CHILD_EXIT_TIMEOUT_MS = parseInt(
   10
 )
 
+function safePathJoin(base: string, segment: string): string {
+  const resolvedBase = path.resolve(base)
+  const resolved = path.resolve(resolvedBase, segment)
+  if (
+    resolved !== resolvedBase &&
+    !resolved.startsWith(resolvedBase + path.sep)
+  ) {
+    throw new Error(
+      `Path "${segment}" resolves outside base directory "${resolvedBase}"`
+    )
+  }
+  return resolved
+}
+
 const handleSessionStop = async (signal: NodeJS.Signals | number | null) => {
   if (signal != null && child?.pid) child.kill(signal)
   if (sessionStopHandled) return
@@ -147,7 +161,7 @@ const handleSessionStop = async (signal: NodeJS.Signals | number | null) => {
         typeof import('../telemetry/storage').Telemetry
       >) ||
       new Telemetry({
-        distDir: path.join(dir, distDir || '.next'),
+        distDir: safePathJoin(dir, distDir || '.next'),
       })
 
     telemetry.record(
@@ -416,7 +430,7 @@ const nextDev = async (
           ...(options.experimentalCpuProf
             ? {
                 NEXT_CPU_PROF: '1',
-                NEXT_CPU_PROF_DIR: path.join(dir, '.next-profiles'),
+                NEXT_CPU_PROF_DIR: safePathJoin(dir, '.next-profiles'),
                 __NEXT_PRIVATE_CPU_PROFILE: 'dev-server',
               }
             : undefined),
@@ -494,9 +508,9 @@ const nextDev = async (
 
         if (key && cert) {
           certificate = {
-            key: path.resolve(key),
-            cert: path.resolve(cert),
-            rootCA: rootCA ? path.resolve(rootCA) : undefined,
+            key: safePathJoin(dir, key),
+            cert: safePathJoin(dir, cert),
+            rootCA: rootCA ? safePathJoin(dir, rootCA) : undefined,
           }
         } else {
           certificate = await createSelfSignedCertificate(host)
@@ -547,7 +561,7 @@ function writeDevState(): void {
     const gitBranch = getGitBranch(dir)
     state[dir] = {
       stopTime: Date.now(),
-      distDirPath: path.join(dir, distDir ?? '.next'),
+      distDirPath: safePathJoin(dir, distDir ?? '.next'),
       ...(gitBranch ? { gitBranch } : {}),
     }
 
