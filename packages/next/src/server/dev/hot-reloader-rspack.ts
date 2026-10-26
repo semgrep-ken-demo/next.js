@@ -136,7 +136,17 @@ export default class HotReloaderRspack extends HotReloaderWebpack {
               }
             })
           )
-          Object.assign(getEntries(multiCompiler.outputPath), builtEntries)
+          const currentEntries = getEntries(multiCompiler.outputPath)
+          for (const key of Object.keys(builtEntries)) {
+            if (
+              key === '__proto__' ||
+              key === 'constructor' ||
+              key === 'prototype'
+            ) {
+              continue
+            }
+            currentEntries[key] = builtEntries[key]
+          }
         } catch (error) {
           console.error('Rspack failed to read built entries cache: ', error)
         }
