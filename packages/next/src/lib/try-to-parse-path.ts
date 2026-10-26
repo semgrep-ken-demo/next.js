@@ -28,7 +28,8 @@ function reportError({ route, parsedPath }: ParseResult, err: any) {
     )
   } else {
     console.error(
-      `\nError parsing ${route} https://nextjs.org/docs/messages/invalid-route-source`,
+      '\nError parsing %s https://nextjs.org/docs/messages/invalid-route-source',
+      route,
       err
     )
   }
