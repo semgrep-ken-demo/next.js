@@ -93,7 +93,12 @@ function preprocessStackTrace(stackTrace: string, distDir?: string): string {
 
           const absolutePath =
             normalizedDistDir + '/' + location.slice('_next/'.length)
-          const fileUrl = `file://${path.resolve(absolutePath)}`
+          const resolvedPath = path.resolve(absolutePath)
+          const resolvedDistDir = path.resolve(normalizedDistDir)
+          if (!resolvedPath.startsWith(resolvedDistDir + path.sep)) {
+            return line
+          }
+          const fileUrl = `file://${resolvedPath}`
 
           return `${prefix} (${fileUrl})`
         }
