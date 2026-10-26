@@ -327,7 +327,8 @@ export async function fetchServerResponse(
 
     if (!isPageUnloading) {
       console.error(
-        `Failed to fetch RSC payload for ${originalUrl}. Falling back to browser navigation.`,
+        'Failed to fetch RSC payload for %s. Falling back to browser navigation.',
+        originalUrl,
         err
       )
     }
