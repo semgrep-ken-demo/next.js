@@ -7,7 +7,7 @@ interface Options {
    * A transformer function that will be applied to the regexp generated
    * from the provided path and path-to-regexp.
    */
-  regexModifier?: (regex: string) => string
+  regexModifier?: (regex: RegExp) => RegExp
   /**
    * When true the function will remove all unnamed parameters
    * from the matched parameters.
@@ -45,9 +45,7 @@ export function getPathMatch(path: string, options?: Options): PatchMatcher {
   })
 
   const matcher = regexpToFunction<Record<string, any>>(
-    options?.regexModifier
-      ? new RegExp(options.regexModifier(regexp.source), regexp.flags)
-      : regexp,
+    options?.regexModifier ? options.regexModifier(regexp) : regexp,
     keys
   )
 
