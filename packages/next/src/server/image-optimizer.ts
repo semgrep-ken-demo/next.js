@@ -6,7 +6,7 @@ import contentDisposition from 'next/dist/compiled/content-disposition'
 import imageSizeOf from 'next/dist/compiled/image-size'
 import { detector } from 'next/dist/compiled/image-detector/detector.js'
 import isAnimated from 'next/dist/compiled/is-animated'
-import { join } from 'path'
+import { join, resolve } from 'path'
 
 import { getImageBlurSvg } from '../shared/lib/image-blur-svg'
 import type { ImageConfigComplete } from '../shared/lib/image-config'
@@ -36,6 +36,14 @@ import { InvariantError } from '../shared/lib/invariant-error'
 import { lookup } from 'dns/promises'
 import { isIP } from 'net'
 import { ALL } from 'dns'
+
+function safeCacheJoin(base: string, ...segments: string[]): string {
+  const resolved = resolve(base, ...segments)
+  if (!resolved.startsWith(resolve(base) + '/') && resolved !== resolve(base)) {
+    throw new Error('Path traversal detected')
+  }
+  return resolved
+}
 
 type XCacheHeader = 'MISS' | 'HIT' | 'STALE'
 
@@ -177,10 +185,11 @@ async function writeToCacheDir(
   etag: string,
   upstreamEtag: string
 ) {
-  const dir = join(/* turbopackIgnore: true */ cacheDir, cacheKey)
-  const filename = join(
+  const dir = safeCacheJoin(/* turbopackIgnore: true */ cacheDir, cacheKey)
+  const filename = safeCacheJoin(
     /* turbopackIgnore: true */
-    dir,
+    cacheDir,
+    cacheKey,
     `${maxAge}.${expireAt}.${etag}.${upstreamEtag}.${extension}`
   )
 
@@ -191,7 +200,7 @@ async function writeToCacheDir(
 }
 
 async function readFromCacheDir(cacheDir: string, cacheKey: string) {
-  const dir = join(/* turbopackIgnore: true */ cacheDir, cacheKey)
+  const dir = safeCacheJoin(/* turbopackIgnore: true */ cacheDir, cacheKey)
   const files = await promises.readdir(dir)
   const file = files[0]
   if (!file) {
@@ -203,7 +212,7 @@ async function readFromCacheDir(cacheDir: string, cacheKey: string) {
     '.',
     5
   )
-  const filePath = join(/* turbopackIgnore: true */ dir, file)
+  const filePath = safeCacheJoin(/* turbopackIgnore: true */ cacheDir, cacheKey, file)
   const buffer = await promises.readFile(/* turbopackIgnore: true */ filePath)
   const expireAt = Number(expireAtSt)
   const maxAge = Number(maxAgeSt)
@@ -212,7 +221,7 @@ async function readFromCacheDir(cacheDir: string, cacheKey: string) {
 
 async function deleteFromCacheDir(cacheDir: string, cacheKey: string) {
   return promises
-    .rm(join(/* turbopackIgnore: true */ cacheDir, cacheKey), {
+    .rm(safeCacheJoin(/* turbopackIgnore: true */ cacheDir, cacheKey), {
       recursive: true,
       force: true,
     })
