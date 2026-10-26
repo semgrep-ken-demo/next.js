@@ -17,7 +17,14 @@ export class FileLogger {
   private mcpServerEnabled: boolean = false
 
   public initialize(distDir: string, mcpServerEnabled: boolean): void {
-    this.logFilePath = path.join(distDir, 'logs', `next-development.log`)
+    const resolvedDistDir = path.resolve(distDir)
+    const logFile = path.join(resolvedDistDir, 'logs', 'next-development.log')
+    if (!logFile.startsWith(resolvedDistDir + path.sep)) {
+      throw new Error(
+        'Invalid distDir: log file path escapes the dist directory'
+      )
+    }
+    this.logFilePath = logFile
     this.mcpServerEnabled = mcpServerEnabled
 
     if (this.isInitialized) {
