@@ -5,7 +5,8 @@ type TypeScript = typeof import('typescript/lib/tsserverlibrary')
 
 let ts: TypeScript
 let info: tsModule.server.PluginCreateInfo
-let appDirRegExp: RegExp
+let appDirPrefix: string
+let appDirSrcPrefix: string
 
 export function log(message: string) {
   info.project.projectService.logger.info('[next] ' + message)
@@ -19,9 +20,9 @@ export function init(opts: {
   const projectDir = opts.info.project.getCurrentDirectory()
   ts = opts.ts
   info = opts.info
-  appDirRegExp = new RegExp(
-    '^' + (projectDir + '(/src)?/app').replace(/[\\/]/g, '[\\/]')
-  )
+  const normalizedDir = projectDir.replace(/\\/g, '/')
+  appDirPrefix = normalizedDir + '/app'
+  appDirSrcPrefix = normalizedDir + '/src/app'
 
   log('Initialized Next.js TypeScript plugin: ' + projectDir)
 }
@@ -98,18 +99,22 @@ export const isDefaultFunctionExport = (
   return false
 }
 
+const matchesAppDir = (filePath: string) => {
+  const normalized = filePath.replace(/\\/g, '/')
+  return normalized.startsWith(appDirPrefix) || normalized.startsWith(appDirSrcPrefix)
+}
 export const isInsideApp = (filePath: string) => {
-  return appDirRegExp.test(filePath)
+  return matchesAppDir(filePath)
 }
 export const isAppEntryFile = (filePath: string) => {
   return (
-    appDirRegExp.test(filePath) &&
+    matchesAppDir(filePath) &&
     /^(page|layout)\.(mjs|js|jsx|ts|tsx)$/.test(path.basename(filePath))
   )
 }
 export const isPageFile = (filePath: string) => {
   return (
-    appDirRegExp.test(filePath) &&
+    matchesAppDir(filePath) &&
     /^page\.(mjs|js|jsx|ts|tsx)$/.test(path.basename(filePath))
   )
 }
