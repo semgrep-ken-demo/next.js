@@ -2556,10 +2556,19 @@ pub async fn project_get_all_compilation_issues(
 /// The `path` should point to the `<distDir>/cache/turbopack` directory.
 #[napi]
 pub async fn turbopack_database_compact(path: String, next_version: String) -> napi::Result<()> {
+    let path = PathBuf::from(path);
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(napi::Error::from_reason(
+            "Database compaction path must not contain parent directory references".to_string(),
+        ));
+    }
     let describe = crate::next_api::turbopack_ctx::cache_describe(&next_version);
     let version_info = crate::next_api::turbopack_ctx::git_version_info(&describe);
     let is_ci = std::env::var("CI").is_ok_and(|v| !v.is_empty());
-    turbo_tasks_backend::compact_database(&PathBuf::from(path), &version_info, is_ci)
+    turbo_tasks_backend::compact_database(&path, &version_info, is_ci)
         .map_err(|e| napi::Error::from_reason(format!("Database compaction failed: {e}")))?;
     Ok(())
 }
