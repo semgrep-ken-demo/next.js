@@ -728,7 +728,9 @@ async fn get_mock_stylesheet(
     mocked_responses_path: &str,
     execution_context: Vc<ExecutionContext>,
 ) -> Result<Option<Vc<RcStr>>> {
-    let response_path = Path::new(&mocked_responses_path);
+    let response_path = Path::new(&mocked_responses_path)
+        .canonicalize()
+        .context("Invalid mocked responses path")?;
     let mock_fs = Vc::upcast::<Box<dyn FileSystem>>(DiskFileSystem::new(
         rcstr!("mock"),
         Vc::cell(
