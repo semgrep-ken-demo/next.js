@@ -462,8 +462,19 @@ pub fn project_new(
                     .join(path)
             }
         } else {
-            PathBuf::from(&options.root_path)
-                .join(&options.project_path)
+            let root = PathBuf::from(&options.root_path);
+            let project_dir = root.join(&options.project_path);
+            let project_dir = project_dir
+                .canonicalize()
+                .unwrap_or_else(|_| project_dir.clone());
+            assert!(
+                project_dir.starts_with(&root)
+                    || project_dir.starts_with(
+                        root.canonicalize().unwrap_or_else(|_| root.clone())
+                    ),
+                "project_path must not escape the root directory"
+            );
+            project_dir
                 .join(DIST_PROFILES_DIR_NAME)
                 // use a generic binary extension to hint to random tools not to read it.
                 .join("trace-turbopack.bin")
