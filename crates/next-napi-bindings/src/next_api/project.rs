@@ -518,6 +518,20 @@ pub fn project_new(
                 )
             })
             .unwrap();
+        let trace_dir = trace_dir
+            .canonicalize()
+            .with_context(|| {
+                format!(
+                    "Unable to canonicalize trace output directory {}",
+                    trace_dir.display()
+                )
+            })
+            .unwrap();
+        let trace_file = trace_dir.join(
+            trace_file
+                .file_name()
+                .expect("Trace file path must have a file name"),
+        );
         let (trace_writer, trace_writer_guard) = match compress {
             Compression::None => {
                 let trace_writer = std::fs::File::create(trace_file.clone()).unwrap();
