@@ -63,7 +63,19 @@ export function evaluateBundle(result: ImportModuleResult): any {
     if (request.startsWith('/')) {
       resolved = request
     } else if (request.startsWith('./') || request.startsWith('../')) {
-      resolved = path.resolve(path.dirname(fromPath), request)
+      // Resolve relative paths manually within the virtual chunk filesystem
+      // to prevent directory traversal outside the virtual root.
+      const dir = path.dirname(fromPath)
+      const segments = [...dir.split('/'), ...request.split('/')]
+      const stack: string[] = []
+      for (const seg of segments) {
+        if (seg === '..') {
+          if (stack.length > 0) stack.pop()
+        } else if (seg !== '.' && seg !== '') {
+          stack.push(seg)
+        }
+      }
+      resolved = '/' + stack.join('/')
     } else {
       // Intercept 'fs' to return the patched version when binary
       // assets are present (needed for WASM loading)
