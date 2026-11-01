@@ -34,6 +34,16 @@ fn decide_early(remaining: usize, min_remaining_decisions: usize) -> bool {
 }
 
 fn write_file<P: AsRef<Path>>(name: &str, path: P, content: &[u8]) -> Result<()> {
+    let path = path.as_ref();
+    if path
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        bail!(
+            "refusing to write {name}: path contains parent directory traversal: {}",
+            path.display()
+        );
+    }
     File::create(path)
         .with_context(|| format!("creating {name}"))?
         .write_all(content)
