@@ -2110,6 +2110,14 @@ pub enum PersistedFileContent {
 impl PersistedFileContent {
     /// Performs a comparison of self's data against a disk file's streamed read.
     async fn streaming_compare(&self, path: &Path) -> Result<FileComparison> {
+        for component in path.components() {
+            if matches!(component, std::path::Component::ParentDir) {
+                bail!(
+                    "path must not contain '..' traversal: {}",
+                    path.display()
+                );
+            }
+        }
         let old_file =
             extract_disk_access(retry_blocking(|| std::fs::File::open(path)).await, path)?;
         let Some(old_file) = old_file else {
