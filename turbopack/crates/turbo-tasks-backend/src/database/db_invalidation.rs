@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fs::{self, File, read_dir},
     io::{self, BufReader, BufWriter, ErrorKind, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::Context;
@@ -63,6 +63,13 @@ pub mod invalidation_reasons {
     pub const USER_REQUEST: &str = concat!(module_path!(), "::USER_REQUEST");
 }
 
+/// Resolve and canonicalize a base path, preventing path traversal attacks.
+fn resolve_base_path(base_path: &Path) -> anyhow::Result<PathBuf> {
+    base_path
+        .canonicalize()
+        .with_context(|| format!("Failed to resolve database path {base_path:?}"))
+}
+
 /// Atomically create an invalidation marker.
 ///
 /// Makes a best-effort attempt to write `reason_code` to the file, but ignores any failure with
@@ -80,6 +87,12 @@ pub mod invalidation_reasons {
 /// In most cases, you should prefer a higher-level API like [`crate::BackingStorage::invalidate`]
 /// to this one.
 pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Result<()> {
+    let base_path = match resolve_base_path(base_path) {
+        Ok(p) => p,
+        // just ignore if the cache directory doesn't exist at all
+        Err(_) if !base_path.exists() => return Ok(()),
+        Err(e) => return Err(e),
+    };
     match File::create_new(base_path.join(INVALIDATION_MARKER)) {
         Ok(file) => {
             let mut writer = BufWriter::new(file);
@@ -115,6 +128,11 @@ pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Resu
 pub(crate) fn check_db_invalidation_and_cleanup(
     base_path: &Path,
 ) -> anyhow::Result<StartupCacheState> {
+    let base_path = match resolve_base_path(base_path) {
+        Ok(p) => p,
+        Err(_) if !base_path.exists() => return Ok(StartupCacheState::NoCache),
+        Err(e) => return Err(e),
+    };
     match File::open(base_path.join(INVALIDATION_MARKER)) {
         Ok(file) => {
             // Best-effort: Try to read the reason_code from the file, if the file format is
@@ -127,7 +145,7 @@ pub(crate) fn check_db_invalidation_and_cleanup(
 
             // if this cleanup fails, we might try to open an invalid database later, so it's best
             // to just propagate the error here.
-            cleanup_db(base_path)?;
+            cleanup_db(&base_path)?;
             Ok(StartupCacheState::Invalidated { reason_code })
         }
         Err(err) if err.kind() == ErrorKind::NotFound => {
@@ -148,7 +166,12 @@ pub(crate) fn check_db_invalidation_and_cleanup(
 /// You should not run this if the database has not yet been invalidated, as this operation is not
 /// atomic and could result in a partially-deleted and corrupted database.
 pub(crate) fn cleanup_db(base_path: &Path) -> anyhow::Result<()> {
-    cleanup_db_inner(base_path).with_context(|| {
+    let base_path = match resolve_base_path(base_path) {
+        Ok(p) => p,
+        Err(_) if !base_path.exists() => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    cleanup_db_inner(&base_path).with_context(|| {
         format!(
             "Unable to remove invalid database. If this issue persists you can work around by \
              deleting {base_path:?}."
