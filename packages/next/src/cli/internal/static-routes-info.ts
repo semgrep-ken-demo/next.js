@@ -20,6 +20,54 @@ import path from 'path'
 import loadConfig from '../../server/config'
 import { PHASE_PRODUCTION_BUILD } from '../../shared/lib/constants'
 
+/**
+ * Join path segments and verify the result stays within `base`.
+ * Prevents path traversal via untrusted build artifact data.
+ */
+function safeJoin(base: string, ...segments: string[]): string {
+  // nosemgrep: path-join-resolve-traversal
+  const joined = path.join(base, ...segments)
+  // nosemgrep: path-join-resolve-traversal
+  const resolvedBase = path.resolve(base)
+  // nosemgrep: path-join-resolve-traversal
+  const resolvedJoined = path.resolve(joined)
+  if (
+    !resolvedJoined.startsWith(resolvedBase + path.sep) &&
+    resolvedJoined !== resolvedBase
+  ) {
+    throw new Error(
+      `Path traversal detected: resolved path escapes ${resolvedBase}`
+    )
+  }
+  return joined
+}
+
+/**
+ * Resolve path segments to an absolute path, validate inputs for null
+ * bytes, and classify whether the result is within `base`. Used for
+ * traced dependency paths that may legitimately resolve outside the
+ * build output directory (e.g. node_modules).
+ */
+function resolveAndClassify(
+  base: string,
+  ...segments: string[]
+): { resolved: string; withinBase: boolean } {
+  for (const s of segments) {
+    if (s.includes('\0')) {
+      throw new Error('Path segment contains null byte')
+    }
+  }
+  // nosemgrep: path-join-resolve-traversal
+  const resolvedBase = path.resolve(base)
+  // nosemgrep: path-join-resolve-traversal
+  const resolved = path.resolve(base, ...segments)
+  return {
+    resolved,
+    withinBase:
+      resolved.startsWith(resolvedBase + path.sep) || resolved === resolvedBase,
+  }
+}
+
 export interface StaticRoutesInfoOptions {
   json?: boolean
   limit?: number
@@ -210,7 +258,7 @@ interface MiddlewareManifest {
 
 function discoverRoutes(distDir: string): RouteEntry[] {
   const middlewareManifest = readJsonFile<MiddlewareManifest>(
-    path.join(distDir, 'server', 'middleware-manifest.json')
+    safeJoin(distDir, 'server', 'middleware-manifest.json')
   )
   // Edge route handlers (per-route runtime: 'edge') live in `functions`.
   // Their key matches either an app-paths-manifest internal key (e.g.
@@ -232,7 +280,7 @@ function discoverPagesRoutes(
   edgeFunctions: Record<string, MiddlewareManifestEntry>
 ): RouteEntry[] {
   const manifest = readJsonFile<Record<string, string>>(
-    path.join(distDir, 'server', 'pages-manifest.json')
+    safeJoin(distDir, 'server', 'pages-manifest.json')
   )
   if (!manifest) return []
 
@@ -268,14 +316,14 @@ function discoverAppRoutes(
   edgeFunctions: Record<string, MiddlewareManifestEntry>
 ): RouteEntry[] {
   const appPathsManifest = readJsonFile<Record<string, string>>(
-    path.join(distDir, 'server', 'app-paths-manifest.json')
+    safeJoin(distDir, 'server', 'app-paths-manifest.json')
   )
   if (!appPathsManifest) return []
 
   // Maps internal entry keys (e.g. "/blog/[slug]/page") to their URL path
   // ("/blog/[slug]"). Optional — falls back to the internal key if missing.
   const appPathRoutesManifest = readJsonFile<Record<string, string>>(
-    path.join(distDir, 'app-path-routes-manifest.json')
+    safeJoin(distDir, 'app-path-routes-manifest.json')
   )
 
   const routes: RouteEntry[] = []
@@ -346,33 +394,33 @@ function collectServerEntryFiles(
   serverEntry: string,
   sets: FileSets
 ): void {
-  const entryRel = path.join('server', serverEntry) // e.g. server/app/page.js
+  const entryRel = safeJoin('server', serverEntry) // e.g. server/app/page.js
   const entryDirRel = path.dirname(entryRel) // e.g. server/app
-  const entryDirAbs = path.join(distDir, entryDirRel)
+  const entryDirAbs = safeJoin(distDir, entryDirRel)
 
   // The entry .js is always part of the bundle, even if no nft.json exists.
   sets.serverBundled.add(entryRel)
 
   const nft = readJsonFile<{ files: string[] }>(
-    path.join(distDir, entryRel + '.nft.json')
+    safeJoin(distDir, entryRel + '.nft.json')
   )
   if (!nft?.files) return
 
   for (const relPath of nft.files) {
-    // Resolve relative to the entry's dir. If the normalized result stays
-    // inside distDir it's a server chunk; if it leaves distDir it's an
-    // unbundled trace dep (e.g. ../../../node_modules/...).
-    const inDistDirPath = path.normalize(path.join(entryDirRel, relPath))
-    const outsideDistDir = inDistDirPath.startsWith('..')
-    const isMap = inDistDirPath.endsWith('.map')
+    // Resolve relative to the entry's dir. Classify whether the result stays
+    // inside distDir (server chunk) or leaves it (unbundled trace dep, e.g.
+    // ../../../node_modules/...).
+    const { resolved: resolvedPath, withinBase: insideDistDir } =
+      resolveAndClassify(distDir, entryDirRel, relPath)
+    const inDistDirPath = path.relative(distDir, resolvedPath)
+    const outsideDistDir = !insideDistDir
+    const isMap = resolvedPath.endsWith('.map')
     if (isMap) {
       // Source maps go into the maps category whether they're in or outside
       // distDir, so they don't double-count under serverUnbundled.
-      sets.serverMaps.add(
-        outsideDistDir ? path.resolve(entryDirAbs, relPath) : inDistDirPath
-      )
+      sets.serverMaps.add(outsideDistDir ? resolvedPath : inDistDirPath)
     } else if (outsideDistDir) {
-      sets.serverUnbundled.add(path.resolve(entryDirAbs, relPath))
+      sets.serverUnbundled.add(resolvedPath)
     } else if (
       inDistDirPath.endsWith('.js') &&
       !inDistDirPath.endsWith('_client-reference-manifest.js')
@@ -565,10 +613,10 @@ function collectAppClientFiles(
 ): void {
   const entryDir = path.dirname(serverEntry)
   const entryBase = path.basename(serverEntry, '.js')
-  const baseDir = path.join(distDir, 'server', entryDir)
+  const baseDir = safeJoin(distDir, 'server', entryDir)
 
   const crm = parseClientReferenceManifest(
-    path.join(baseDir, `${entryBase}_client-reference-manifest.js`)
+    safeJoin(baseDir, `${entryBase}_client-reference-manifest.js`)
   )
   if (crm) {
     if (crm.entryJSFiles) {
@@ -600,7 +648,7 @@ function collectAppClientFiles(
   // under `rootMainFiles`. Turbopack also writes a per-route
   // `build-manifest.json` containing the same files; webpack does not.
   const globalBm = readJsonFile<{ rootMainFiles?: string[] }>(
-    path.join(distDir, 'build-manifest.json')
+    safeJoin(distDir, 'build-manifest.json')
   )
   for (const chunk of globalBm?.rootMainFiles ?? []) addClientChunk(chunk, sets)
 }
@@ -620,7 +668,7 @@ function collectPagesClientFiles(
   const bm = readJsonFile<{
     pages?: Record<string, string[]>
     polyfillFiles?: string[]
-  }>(path.join(distDir, 'build-manifest.json'))
+  }>(safeJoin(distDir, 'build-manifest.json'))
   if (!bm) return
   const chunks = [
     ...(bm.pages?.['/_app'] ?? []),
@@ -657,29 +705,33 @@ function deriveSourceMaps(
   urlCache: Map<string, string | null>
 ): void {
   for (const f of source) {
-    const fullPath = path.isAbsolute(f) ? f : path.join(distDir, f)
+    const fullPath = path.isAbsolute(f) ? f : safeJoin(distDir, f)
     let mapFromUrl = urlCache.get(fullPath)
     if (mapFromUrl === undefined) {
       mapFromUrl = readSourceMappingURL(fullPath)
       urlCache.set(fullPath, mapFromUrl)
     }
     if (mapFromUrl) {
-      // Resolve relative to the source file's directory, then re-express
-      // relative to distDir so paths join consistently.
-      const mapRel = path.normalize(path.join(path.dirname(f), mapFromUrl))
-      if (
-        !mapRel.startsWith('..') &&
-        fs.existsSync(path.join(distDir, mapRel))
-      ) {
-        target.add(mapRel)
-        continue
+      // Resolve relative to the source file's directory and classify
+      // whether it stays within distDir.
+      const { resolved: mapAbs, withinBase } = resolveAndClassify(
+        distDir,
+        path.dirname(f),
+        mapFromUrl
+      )
+      if (withinBase) {
+        const mapRel = path.relative(distDir, mapAbs)
+        if (fs.existsSync(mapAbs)) {
+          target.add(mapRel)
+          continue
+        }
       }
     }
     // Fallback: co-located `<file>.map`.
     const adjacent = f + '.map'
     const adjacentFull = path.isAbsolute(adjacent)
       ? adjacent
-      : path.join(distDir, adjacent)
+      : safeJoin(distDir, adjacent)
     if (fs.existsSync(adjacentFull)) target.add(adjacent)
   }
 }
@@ -816,7 +868,7 @@ function buildSizeCache(distDir: string, allFileSets: FileSets[]): SizeCache {
     for (const cat of CATEGORIES) {
       for (const f of sets[cat]) {
         if (cache.has(f)) continue
-        const fullPath = path.isAbsolute(f) ? f : path.join(distDir, f)
+        const fullPath = path.isAbsolute(f) ? f : safeJoin(distDir, f)
         try {
           const stat = fs.lstatSync(fullPath)
           cache.set(
@@ -1139,12 +1191,13 @@ export async function staticRoutesInfoCli(
     process.exit(1)
   }
 
+  // nosemgrep: path-join-resolve-traversal -- CLI arg: user intentionally specifies the directory
   const dir = path.resolve(directory ?? process.cwd())
   const config = await loadConfig(PHASE_PRODUCTION_BUILD, dir)
-  const distDir = path.join(dir, config.distDir)
+  const distDir = safeJoin(dir, config.distDir)
 
   // BUILD_ID is the standard sentinel that a Next.js build completed.
-  if (!fs.existsSync(path.join(distDir, 'BUILD_ID'))) {
+  if (!fs.existsSync(safeJoin(distDir, 'BUILD_ID'))) {
     console.error(
       `Error: No build found at ${distDir}. Run \`next build\` first.`
     )
