@@ -1290,7 +1290,7 @@ export default abstract class Server<
 
               if (matcherParams) {
                 utils.normalizeDynamicRouteParams(matcherParams, false)
-                Object.assign(paramsResult.params, matcherParams)
+                paramsResult.params = { ...paramsResult.params, ...matcherParams }
                 paramsResult.hasValidParams = true
               }
             }
@@ -1317,7 +1317,7 @@ export default abstract class Server<
                 )
 
                 if (curParamsResult.hasValidParams) {
-                  Object.assign(params, matcherParams)
+                  params = { ...params, ...matcherParams }
                   paramsResult = curParamsResult
                 }
               }
@@ -1484,7 +1484,7 @@ export default abstract class Server<
         !getRequestMeta(req, 'incrementalCache')
       ) {
         const incrementalCache = await this.getIncrementalCache({
-          requestHeaders: Object.assign({}, req.headers),
+          requestHeaders: { ...req.headers },
         })
 
         incrementalCache.resetRequestCache()
@@ -1516,7 +1516,7 @@ export default abstract class Server<
           const invokeQuery = getRequestMeta(req, 'invokeQuery')
 
           if (invokeQuery) {
-            Object.assign(parsedUrl.query, invokeQuery)
+            parsedUrl.query = { ...parsedUrl.query, ...invokeQuery }
           }
 
           res.statusCode = invokeStatus
@@ -1558,7 +1558,7 @@ export default abstract class Server<
         const invokeQuery = getRequestMeta(req, 'invokeQuery')
 
         if (invokeQuery) {
-          Object.assign(parsedUrl.query, invokeQuery)
+          parsedUrl.query = { ...parsedUrl.query, ...invokeQuery }
         }
 
         finished = await this.normalizeAndAttachMetadata(req, res, parsedUrl)
@@ -2349,7 +2349,7 @@ export default abstract class Server<
     // use existing incrementalCache instance if available
     const incrementalCache: import('./lib/incremental-cache').IncrementalCache =
       await this.getIncrementalCache({
-        requestHeaders: Object.assign({}, req.headers),
+        requestHeaders: { ...req.headers },
       })
 
     // TODO: investigate, this is not safe across multiple concurrent requests
