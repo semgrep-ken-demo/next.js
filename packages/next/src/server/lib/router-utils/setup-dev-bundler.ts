@@ -181,6 +181,22 @@ export async function propagateServerField(
   await opts.renderServer?.instance?.propagateServerField(opts.dir, field, args)
 }
 
+function safePathResolve(base: string, ...segments: string[]): string {
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const resolved = path.resolve(base, ...segments)
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const resolvedBase = path.resolve(base)
+  if (
+    resolved !== resolvedBase &&
+    !resolved.startsWith(resolvedBase + path.sep)
+  ) {
+    throw new Error(
+      `Path "${resolved}" traverses outside of the allowed directory "${resolvedBase}"`
+    )
+  }
+  return resolved
+}
+
 async function startWatcher(
   opts: SetupOpts & {
     isSrcDir: boolean
@@ -189,7 +205,7 @@ async function startWatcher(
   const { nextConfig, appDir, pagesDir, dir, resetFetch } = opts
   const { useFileSystemPublicRoutes } = nextConfig
 
-  const distDir = path.join(opts.dir, opts.nextConfig.distDir)
+  const distDir = safePathResolve(opts.dir, opts.nextConfig.distDir)
 
   setGlobal('distDir', distDir)
   setGlobal('phase', PHASE_DEVELOPMENT_SERVER)
@@ -210,7 +226,7 @@ async function startWatcher(
     }
 
     lockfile = await Lockfile.acquireWithRetriesOrExit(
-      path.join(distDir, 'lock'),
+      safePathResolve(distDir, 'lock'),
       'next dev',
       true,
       JSON.stringify(serverInfo),
@@ -275,7 +291,7 @@ async function startWatcher(
 
   await hotReloader.start()
 
-  const distTypesDir = path.join(distDir, 'types')
+  const distTypesDir = safePathResolve(distDir, 'types')
   await writeRouteTypesManifest(
     {
       appRoutes: {},
@@ -292,11 +308,11 @@ async function startWatcher(
       filePathToRoute: new Map(),
       rootParams: new Map(),
     },
-    path.join(distTypesDir, 'routes.d.ts'),
+    safePathResolve(distTypesDir, 'routes.d.ts'),
     opts.nextConfig
   )
 
-  const routesManifestPath = path.join(distDir, ROUTES_MANIFEST)
+  const routesManifestPath = safePathResolve(distDir, ROUTES_MANIFEST)
   const routesManifest: DevRoutesManifest = {
     version: 3,
     caseSensitive: !!nextConfig.experimental.caseSensitiveRoutes,
@@ -313,7 +329,7 @@ async function startWatcher(
     JSON.stringify(routesManifest)
   )
 
-  const prerenderManifestPath = path.join(distDir, PRERENDER_MANIFEST)
+  const prerenderManifestPath = safePathResolve(distDir, PRERENDER_MANIFEST)
   await fs.promises.writeFile(
     prerenderManifestPath,
     JSON.stringify(
@@ -332,7 +348,7 @@ async function startWatcher(
   if (opts.nextConfig.experimental.nextScriptWorkers) {
     await verifyPartytownSetup(
       opts.dir,
-      path.join(distDir, CLIENT_STATIC_FILES_PATH)
+      safePathResolve(distDir, CLIENT_STATIC_FILES_PATH)
     )
   }
 
@@ -372,11 +388,11 @@ async function startWatcher(
     const rootDir = pagesDir || appDir
     const files = [
       ...getPossibleMiddlewareFilenames(
-        path.join(rootDir!, '..'),
+        safePathResolve(rootDir!, '..'),
         nextConfig.pageExtensions
       ),
       ...getPossibleInstrumentationHookFilenames(
-        path.join(rootDir!, '..'),
+        safePathResolve(rootDir!, '..'),
         nextConfig.pageExtensions
       ),
     ]
@@ -387,14 +403,14 @@ async function startWatcher(
       '.env.local',
       '.env.development',
       '.env',
-    ].map((file) => path.join(dir, file))
+    ].map((file) => safePathResolve(dir, file))
 
     files.push(...envFiles)
 
     // tsconfig/jsconfig paths hot-reloading
     const tsconfigPaths = [
-      path.join(dir, 'tsconfig.json'),
-      path.join(dir, 'jsconfig.json'),
+      safePathResolve(dir, 'tsconfig.json'),
+      safePathResolve(dir, 'jsconfig.json'),
     ] as const
     files.push(...tsconfigPaths)
 
@@ -415,8 +431,8 @@ async function startWatcher(
     let previousClientRouterFilters: any
     let previousConflictingPagePaths: Set<string> = new Set()
 
-    const routeTypesFilePath = path.join(distDir, 'types', 'routes.d.ts')
-    const validatorFilePath = path.join(distDir, 'types', 'validator.ts')
+    const routeTypesFilePath = safePathResolve(distDir, 'types', 'routes.d.ts')
+    const validatorFilePath = safePathResolve(distDir, 'types', 'validator.ts')
 
     let initialWatchTime = performance.now() + performance.timeOrigin
     wp.on('aggregated', async () => {
@@ -467,7 +483,7 @@ async function startWatcher(
         const { name: fileBaseName, dir: fileDir } = path.parse(fileName)
 
         const isAtConventionLevel =
-          fileDir === dir || fileDir === path.join(dir, 'src')
+          fileDir === dir || fileDir === safePathResolve(dir, 'src')
 
         if (isAtConventionLevel && fileBaseName === MIDDLEWARE_FILENAME) {
           middlewareFilePath = fileName
@@ -1192,12 +1208,12 @@ async function startWatcher(
           )
 
           // Generate cache-life types if cacheLife config exists
-          const cacheLifeFilePath = path.join(distTypesDir, 'cache-life.d.ts')
+          const cacheLifeFilePath = safePathResolve(distTypesDir, 'cache-life.d.ts')
           writeCacheLifeTypes(opts.nextConfig.cacheLife, cacheLifeFilePath)
 
           await writeRootParamsTypes(
             routeTypesManifest,
-            path.join(distTypesDir, 'root-params.d.ts')
+            safePathResolve(distTypesDir, 'root-params.d.ts')
           )
         }
 
