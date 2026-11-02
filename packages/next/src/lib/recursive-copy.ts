@@ -20,13 +20,16 @@ export async function recursiveCopy(
   } = {}
 ): Promise<void> {
   const cwdPath = process.cwd()
-  const from = path.resolve(cwdPath, source)
-  const to = path.resolve(cwdPath, dest)
+  const sanitizedSource = source.replace(/\0/g, '')
+  const sanitizedDest = dest.replace(/\0/g, '')
+  const from = path.resolve(cwdPath, sanitizedSource)
+  const to = path.resolve(cwdPath, sanitizedDest)
 
   const sema = new Sema(concurrency)
 
   // deep copy the file/directory
-  async function _copy(item: string, lstats?: Stats | Dirent): Promise<void> {
+  async function _copy(rawItem: string, lstats?: Stats | Dirent): Promise<void> {
+    const item = rawItem.replace(/\0/g, '')
     const target = item.replace(from, to)
 
     await sema.acquire()
@@ -58,7 +61,10 @@ export async function recursiveCopy(
       sema.release()
       const files = await promises.readdir(item, { withFileTypes: true })
       await Promise.all(
-        files.map((file) => _copy(path.join(item, file.name), file))
+        files.map((file) => {
+          const name = file.name.replace(/\0/g, '')
+          return _copy(path.join(item, name), file)
+        })
       )
     } else if (
       isFile &&
