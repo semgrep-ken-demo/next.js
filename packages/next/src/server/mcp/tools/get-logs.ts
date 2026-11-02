@@ -6,7 +6,7 @@
  */
 import type { McpServer } from 'next/dist/compiled/@modelcontextprotocol/sdk/server/mcp'
 import { stat } from 'fs/promises'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { mcpTelemetryTracker } from '../mcp-telemetry-tracker'
 
 export function registerGetLogsTool(server: McpServer, distDir: string) {
@@ -21,7 +21,21 @@ export function registerGetLogsTool(server: McpServer, distDir: string) {
       mcpTelemetryTracker.recordToolCall('mcp/get_logs')
 
       try {
-        const logFilePath = join(distDir, 'logs', 'next-development.log')
+        const resolvedDistDir = resolve(distDir)
+        const logFilePath = join(resolvedDistDir, 'logs', 'next-development.log')
+
+        if (!logFilePath.startsWith(resolvedDistDir)) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify({
+                  error: 'Invalid distDir path.',
+                }),
+              },
+            ],
+          }
+        }
 
         // Check if the log file exists
         try {
