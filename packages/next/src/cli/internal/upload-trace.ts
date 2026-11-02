@@ -82,7 +82,7 @@ function validateTurbopackTrace(header: Buffer, file: string): void {
 export async function uploadTraceToBlob(
   options: UploadTraceOptions
 ): Promise<void> {
-  const dir = options.directory || process.cwd()
+  const dir = path.resolve(options.directory || process.cwd())
   const profilesDir = path.join(dir, '.next-profiles')
 
   let entries: string[]
@@ -120,7 +120,11 @@ export async function uploadTraceToBlob(
   let uploadedCount = 0
 
   for (const file of uploadableFiles) {
-    const filePath = path.join(profilesDir, file)
+    const filePath = path.resolve(profilesDir, file)
+    if (!filePath.startsWith(profilesDir + path.sep)) {
+      console.error(`Error: Invalid file path detected: ${file}`)
+      process.exit(1)
+    }
 
     const stat = await fs.stat(filePath)
     if (stat.size === 0) {
