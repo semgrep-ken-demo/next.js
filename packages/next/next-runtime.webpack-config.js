@@ -83,9 +83,9 @@ const externalsMap = {
     'commonjs next/dist/next-devtools/dev-overlay.shim.js',
 }
 
-const externalsRegexMap = {
-  '(.*)trace/tracer$': 'next/dist/server/lib/trace/tracer',
-}
+const externalsRegexMap = [
+  { pattern: /(.*)trace\/tracer$/, replacement: 'next/dist/server/lib/trace/tracer' },
+]
 
 const bundleTypes = {
   app: {
@@ -154,11 +154,11 @@ module.exports = ({ dev, turbo, bundleType, experimental, ...rest }) => {
         )
         callback(null, `commonjs ${relative}`)
       } else {
-        const regexMatch = Object.keys(externalsRegexMap).find((regex) =>
-          new RegExp(regex).test(request)
+        const regexMatch = externalsRegexMap.find(({ pattern }) =>
+          pattern.test(request)
         )
         if (regexMatch) {
-          return callback(null, 'commonjs ' + externalsRegexMap[regexMatch])
+          return callback(null, 'commonjs ' + regexMatch.replacement)
         }
         callback()
       }
