@@ -31,6 +31,10 @@ export async function fetchInlineAsset(options: {
   }
 
   const filePath = resolve(options.distDir, asset.filePath)
+  const normalizedDistDir = resolve(options.distDir) + '/'
+  if (!filePath.startsWith(normalizedDistDir)) {
+    return
+  }
   const fileIsReadable = await fs.access(filePath).then(
     () => true,
     () => false
