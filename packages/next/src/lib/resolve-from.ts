@@ -26,7 +26,7 @@ export const resolveFrom = (
     fromDirectory = realpathSync(fromDirectory)
   } catch (error: unknown) {
     if (isError(error) && error.code === 'ENOENT') {
-      fromDirectory = path.resolve(fromDirectory)
+      fromDirectory = path.resolve(fromDirectory.replace(/\.\.[\\/]/g, ''))
     } else if (silent) {
       return
     } else {
@@ -34,7 +34,8 @@ export const resolveFrom = (
     }
   }
 
-  const fromFile = path.join(fromDirectory, 'noop.js')
+  const sanitizedDirectory = fromDirectory.replace(/\.\.[\\/]/g, '')
+  const fromFile = path.join(sanitizedDirectory, 'noop.js')
 
   const resolveFileName = () =>
     // @ts-expect-error
