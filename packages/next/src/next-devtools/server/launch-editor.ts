@@ -452,7 +452,11 @@ export async function openFileInEditor(
   } else if (path.isAbsolute(file)) {
     filePath = file
   } else {
-    filePath = path.join(nextRootDirectory, file)
+    filePath = path.resolve(nextRootDirectory, file)
+    const resolvedRoot = path.resolve(nextRootDirectory)
+    if (!filePath.startsWith(resolvedRoot + path.sep)) {
+      return { found: false, error: new Error('Invalid file path') }
+    }
   }
 
   const result = {
