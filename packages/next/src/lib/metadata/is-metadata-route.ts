@@ -30,6 +30,10 @@ export const STATIC_METADATA_IMAGES = {
 // TODO-METADATA: support more metadata routes with more extensions
 export const DEFAULT_METADATA_ROUTE_EXTENSIONS = ['js', 'jsx', 'ts', 'tsx']
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // Match the file extension with the dynamic multi-routes extensions
 // e.g. ([xml, js], null) -> can match `/sitemap.xml/route`, `sitemap.js/route`
 // e.g. ([png], [ts]) -> can match `/opengraph-image.png`, `/opengraph-image.ts`
@@ -37,12 +41,14 @@ export const getExtensionRegexString = (
   staticExtensions: readonly string[],
   dynamicExtensions: readonly string[] | null
 ) => {
+  const escapedStatic = staticExtensions.map(escapeRegExp)
   let result: string
   // If there's no possible multi dynamic routes, will not match any <name>[].<ext> files
   if (!dynamicExtensions || dynamicExtensions.length === 0) {
-    result = `(\\.(?:${staticExtensions.join('|')}))`
+    result = `(\\.(?:${escapedStatic.join('|')}))`
   } else {
-    result = `(?:\\.(${staticExtensions.join('|')})|(\\.(${dynamicExtensions.join('|')})))`
+    const escapedDynamic = dynamicExtensions.map(escapeRegExp)
+    result = `(?:\\.(${escapedStatic.join('|')})|(\\.(${escapedDynamic.join('|')})))`
   }
   return result
 }
