@@ -9,7 +9,11 @@ export async function getTypeScriptIntent(
   intentDirs: string[],
   tsconfigPath: string
 ): Promise<TypeScriptIntent | false> {
-  const resolvedTsConfigPath = path.join(baseDir, tsconfigPath)
+  const resolvedTsConfigPath = path.resolve(baseDir, tsconfigPath)
+  const resolvedBaseDir = path.resolve(baseDir)
+  if (!resolvedTsConfigPath.startsWith(resolvedBaseDir + path.sep) && resolvedTsConfigPath !== resolvedBaseDir) {
+    return false
+  }
 
   // The integration turns on if we find a `tsconfig.json` in the user's
   // project.
