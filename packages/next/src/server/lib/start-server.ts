@@ -558,7 +558,8 @@ export async function startServer(
     // Note: dir is absolute and normalized (`..` segments removed), `absDistDir`
     // is also normalized because `path.join()` performs normalization. `distDir`
     // does not have to be inside of `dir`!
-    const absDistDir = path.join(dir, distDir)
+    const sanitizedDir = dir.replace(/\0/g, '')
+    const absDistDir = path.join(sanitizedDir, distDir)
     // always watch dir and absDistDir
     const dirWatchPaths: string[] = [dir, absDistDir]
     // also watch ancestors of absDistDir that are inside of dir.
