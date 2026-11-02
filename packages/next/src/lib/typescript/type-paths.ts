@@ -44,5 +44,9 @@ export function getDevTypesPath(
   }
 
   // In build mode, dev types are at "{baseDir}/{distDir}/dev/types" and should be filtered
-  return path.join(baseDir, distDir, 'dev', 'types')
+  const resolved = path.resolve(baseDir, distDir, 'dev', 'types')
+  if (!resolved.startsWith(path.resolve(baseDir) + path.sep)) {
+    throw new Error('#{distDir} must not escape the project directory')
+  }
+  return resolved
 }
