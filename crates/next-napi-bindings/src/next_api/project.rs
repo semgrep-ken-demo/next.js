@@ -2559,7 +2559,16 @@ pub async fn turbopack_database_compact(path: String, next_version: String) -> n
     let describe = crate::next_api::turbopack_ctx::cache_describe(&next_version);
     let version_info = crate::next_api::turbopack_ctx::git_version_info(&describe);
     let is_ci = std::env::var("CI").is_ok_and(|v| !v.is_empty());
-    turbo_tasks_backend::compact_database(&PathBuf::from(path), &version_info, is_ci)
+    let path = PathBuf::from(path);
+    if !path.is_absolute() {
+        return Err(napi::Error::from_reason(
+            "Database compaction path must be absolute",
+        ));
+    }
+    let path = path.canonicalize().map_err(|e| {
+        napi::Error::from_reason(format!("Failed to resolve database path: {e}"))
+    })?;
+    turbo_tasks_backend::compact_database(&path, &version_info, is_ci)
         .map_err(|e| napi::Error::from_reason(format!("Database compaction failed: {e}")))?;
     Ok(())
 }
