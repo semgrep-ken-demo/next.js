@@ -834,6 +834,13 @@ impl FileSystem for DiskFileSystem {
         }
         let full_path = self.to_sys_path(&fs_path);
 
+        let normalized = full_path
+            .normalize_lexically()
+            .context("normalizing read_link path")?;
+        if !normalized.starts_with(self.inner.root_path()) {
+            return Ok(LinkContent::NotFound.cell());
+        }
+
         self.inner.register_read_invalidator(&full_path).await?;
 
         let _lock = self.inner.lock_path(&full_path).await;
