@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Component, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -64,11 +67,20 @@ impl CustomTransformer for RelayTransformer {
     async fn transform(&self, program: &mut Program, ctx: &TransformContext<'_>) -> Result<()> {
         // If user supplied artifact_directory, it should be resolvable already.
         // Otherwise, supply default relative path (./__generated__)
-        let path_to_proj = PathBuf::from(
-            ctx.file_path
-                .parent()
-                .get_relative_path_to(&self.project_path)
-                .context("Expected relative path to relay artifact")?,
+        let raw_relative = ctx
+            .file_path
+            .parent()
+            .get_relative_path_to(&self.project_path)
+            .context("Expected relative path to relay artifact")?;
+
+        let path_to_proj = PathBuf::from(&raw_relative);
+        anyhow::ensure!(
+            path_to_proj.components().all(|c| matches!(
+                c,
+                Component::CurDir | Component::ParentDir | Component::Normal(_)
+            )),
+            "Relay artifact relative path must not contain absolute or prefix components: \
+             {raw_relative}"
         );
 
         program.mutate(swc_relay::relay(
