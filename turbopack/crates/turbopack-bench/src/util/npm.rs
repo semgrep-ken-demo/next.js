@@ -31,6 +31,8 @@ impl std::fmt::Display for NpmPackage<'_> {
 }
 
 pub fn install(install_dir: &Path, packages: &[NpmPackage<'_>]) -> Result<()> {
+    let install_dir = install_dir.canonicalize()?;
+
     if !fs::metadata(install_dir.join("package.json"))
         .map(|metadata| metadata.is_file())
         .unwrap_or(false)
