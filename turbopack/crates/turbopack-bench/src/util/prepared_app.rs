@@ -20,6 +20,9 @@ use url::Url;
 use crate::{BINDING_NAME, bundlers::Bundler, util::PageGuard};
 
 async fn copy_dir(from: PathBuf, to: PathBuf) -> anyhow::Result<()> {
+    let from = from
+        .canonicalize()
+        .context("Failed to canonicalize source path")?;
     copy_dir_inner(from, to, Arc::new(Semaphore::new(64))).await
 }
 
@@ -44,16 +47,30 @@ async fn copy_dir_inner(
             .acquire()
             .await
             .expect("semaphore is never closed");
-        let mut dir = spawn_blocking(|| std::fs::read_dir(from)).await??;
+        let canonical_from = from.clone();
+        let mut dir = spawn_blocking(move || std::fs::read_dir(canonical_from)).await??;
         for entry in &mut dir {
             let entry = entry?;
+            let entry_path = entry.path().canonicalize().with_context(|| {
+                format!(
+                    "Failed to canonicalize entry path: {}",
+                    entry.path().display()
+                )
+            })?;
+            if !entry_path.starts_with(&from) {
+                bail!(
+                    "Path traversal detected: {} escapes source directory {}",
+                    entry_path.display(),
+                    from.display()
+                );
+            }
             let ty = entry.file_type()?;
             let to = to.join(entry.file_name());
             if ty.is_dir() {
                 let semaphore = semaphore.clone();
                 jobs.push(tokio::spawn(async move {
                     tokio::fs::create_dir(&to).await?;
-                    copy_dir_inner_send(entry.path(), to, semaphore).await
+                    copy_dir_inner_send(entry_path, to, semaphore).await
                 }));
             } else if ty.is_file() {
                 let semaphore = semaphore.clone();
@@ -62,7 +79,7 @@ async fn copy_dir_inner(
                         .acquire()
                         .await
                         .expect("semaphore is never closed");
-                    tokio::fs::copy(entry.path(), to).await?;
+                    tokio::fs::copy(entry_path, to).await?;
                     Ok::<_, anyhow::Error>(())
                 }));
             }
