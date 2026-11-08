@@ -33,7 +33,23 @@ fn decide_early(remaining: usize, min_remaining_decisions: usize) -> bool {
     }
 }
 
-fn write_file<P: AsRef<Path>>(name: &str, path: P, content: &[u8]) -> Result<()> {
+fn write_file<P: AsRef<Path>>(name: &str, base: &Path, path: P, content: &[u8]) -> Result<()> {
+    let path = path.as_ref();
+    let canonical_base = base
+        .canonicalize()
+        .with_context(|| format!("canonicalizing base directory {}", base.display()))?;
+    let canonical_parent = path
+        .parent()
+        .with_context(|| format!("getting parent of {}", path.display()))?
+        .canonicalize()
+        .with_context(|| format!("canonicalizing parent of {}", path.display()))?;
+    if !canonical_parent.starts_with(&canonical_base) {
+        bail!(
+            "refusing to write {name}: {} is outside base directory {}",
+            path.display(),
+            base.display()
+        );
+    }
     File::create(path)
         .with_context(|| format!("creating {name}"))?
         .write_all(content)
@@ -180,6 +196,7 @@ impl TestAppBuilder {
                 };
                 write_file(
                     &format!("leaf file {}", file.display()),
+                    path,
                     &file,
                     formatdoc! {r#"
                         {maybe_use_client}
@@ -264,6 +281,7 @@ impl TestAppBuilder {
                     };
                     write_file(
                         &format!("file with children {}", file.display()),
+                        path,
                         &file,
                         formatdoc! {r#"
                             {setup_imports}
@@ -318,6 +336,7 @@ impl TestAppBuilder {
         "#};
         write_file(
             "bootstrap file",
+            path,
             src.join("index.jsx"),
             bootstrap.as_bytes(),
         )?;
@@ -338,6 +357,7 @@ impl TestAppBuilder {
         "#};
         write_file(
             "bootstrap page",
+            path,
             pages.join("page.jsx"),
             bootstrap_page.as_bytes(),
         )?;
@@ -361,6 +381,7 @@ impl TestAppBuilder {
         "#};
         write_file(
             "bootstrap static page",
+            path,
             pages.join("static.jsx"),
             bootstrap_static_page.as_bytes(),
         )?;
@@ -382,6 +403,7 @@ impl TestAppBuilder {
         "#};
         write_file(
             "bootstrap app page",
+            path,
             app_dir.join("app/page.jsx"),
             bootstrap_app_page.as_bytes(),
         )?;
@@ -400,6 +422,7 @@ impl TestAppBuilder {
             "#};
             write_file(
                 "effect component",
+                path,
                 src.join("effect.jsx"),
                 effect_component.as_bytes(),
             )?;
@@ -419,6 +442,7 @@ impl TestAppBuilder {
         "#};
         write_file(
             "bootstrap app client page",
+            path,
             app_dir.join("client/page.jsx"),
             bootstrap_app_client_page.as_bytes(),
         )?;
@@ -442,6 +466,7 @@ impl TestAppBuilder {
         "#};
         write_file(
             "bootstrap layout",
+            path,
             app_dir.join("layout.jsx"),
             bootstrap_layout.as_bytes(),
         )?;
@@ -462,6 +487,7 @@ impl TestAppBuilder {
         "#};
         write_file(
             "bootstrap html in root",
+            path,
             path.join("index.html"),
             bootstrap_html.as_bytes(),
         )?;
@@ -486,22 +512,26 @@ impl TestAppBuilder {
 
         write_file(
             "bootstrap html",
+            path,
             public.join("index.html"),
             bootstrap_html2.as_bytes(),
         )?;
 
         write_file(
             "vite node.js server",
+            path,
             path.join("vite-server.mjs"),
             include_bytes!("templates/vite-server.mjs"),
         )?;
         write_file(
             "vite server entry",
+            path,
             path.join("src/vite-entry-server.jsx"),
             include_bytes!("templates/vite-entry-server.jsx"),
         )?;
         write_file(
             "vite client entry",
+            path,
             path.join("src/vite-entry-client.jsx"),
             include_bytes!("templates/vite-entry-client.jsx"),
         )?;
@@ -519,6 +549,7 @@ impl TestAppBuilder {
             });
             write_file(
                 "package.json",
+                path,
                 path.join("package.json"),
                 format!("{package_json:#}").as_bytes(),
             )?;
