@@ -217,7 +217,7 @@ pub async fn run(args: FsWatcher) -> anyhow::Result<()> {
                         let relative_target = Path::new("..").join(&new_target_relative);
 
                         remove_symlink(&symlink_path, mode)?;
-                        create_symlink(&symlink_path, &relative_target, mode)?;
+                        create_symlink(&symlink_path, &relative_target, mode, &fs_root)?;
 
                         modified_file_paths.insert(symlink_path);
                         symlink_targets[symlink_idx] = new_target_relative;
@@ -563,14 +563,44 @@ fn create_initial_symlinks(
     let mut symlink_targets = Vec::new();
     for i in 0..symlink_count {
         let symlink_path = symlinks_dir.join(i.to_string());
-        create_symlink(&symlink_path, &relative_target, symlink_mode)?;
+        create_symlink(&symlink_path, &relative_target, symlink_mode, fs_root)?;
         symlink_targets.push(initial_target_relative.clone());
     }
 
     Ok(symlink_targets)
 }
 
-fn create_symlink(link_path: &Path, target: &Path, mode: SymlinkMode) -> anyhow::Result<()> {
+fn normalize_path(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut components: Vec<Component<'_>> = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => match components.last() {
+                Some(Component::Normal(_)) => {
+                    components.pop();
+                }
+                _ => components.push(component),
+            },
+            Component::CurDir => {}
+            c => components.push(c),
+        }
+    }
+    components.iter().collect()
+}
+
+fn create_symlink(
+    link_path: &Path,
+    target: &Path,
+    mode: SymlinkMode,
+    fs_root: &Path,
+) -> anyhow::Result<()> {
+    let resolved = link_path.parent().unwrap_or(link_path).join(target);
+    let normalized = normalize_path(&resolved);
+    anyhow::ensure!(
+        normalized.starts_with(fs_root),
+        "symlink target escapes filesystem root: {target:?} resolves to {normalized:?}"
+    );
+
     #[cfg(unix)]
     {
         let _ = mode;
