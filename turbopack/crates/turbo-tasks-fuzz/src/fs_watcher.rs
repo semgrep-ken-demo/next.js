@@ -515,20 +515,35 @@ fn create_directory_tree(
     depth: usize,
     width: usize,
 ) -> anyhow::Result<()> {
+    let canonical_parent = parent.canonicalize()?;
     let mut rng = rand::rng();
     let mut rand_buf = [0; 16];
     for child_id in 0..width {
         let child_name = child_id.to_string();
-        let child_path = parent.join(&child_name);
+        let child_path = canonical_parent.join(&child_name);
         if depth == 1 {
             let mut f = std::fs::File::create(&child_path)?;
+            let real_path = child_path.canonicalize()?;
+            anyhow::ensure!(
+                real_path.starts_with(&canonical_parent),
+                "path traversal detected: {:?} escapes {:?}",
+                real_path,
+                canonical_parent,
+            );
             rng.fill_bytes(&mut rand_buf);
             f.write_all(&rand_buf)?;
             f.flush()?;
             modified_file_paths.insert(child_path);
         } else {
             std::fs::create_dir(&child_path)?;
-            create_directory_tree(modified_file_paths, &child_path, depth - 1, width)?;
+            let real_path = child_path.canonicalize()?;
+            anyhow::ensure!(
+                real_path.starts_with(&canonical_parent),
+                "path traversal detected: {:?} escapes {:?}",
+                real_path,
+                canonical_parent,
+            );
+            create_directory_tree(modified_file_paths, &real_path, depth - 1, width)?;
         }
     }
     Ok(())
