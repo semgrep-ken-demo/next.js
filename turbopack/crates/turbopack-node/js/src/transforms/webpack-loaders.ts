@@ -71,6 +71,16 @@ const {
 
 const contextDir = process.cwd()
 
+const ensureWithinContextDir = (resolved: string): string => {
+  const normalBase = contextDir.endsWith(path.sep)
+    ? contextDir
+    : contextDir + path.sep
+  if (resolved !== contextDir && !resolved.startsWith(normalBase)) {
+    throw new Error('Path traversal detected: path resolves outside context directory')
+  }
+  return resolved
+}
+
 const LogType = Object.freeze({
   error: 'error',
   warn: 'warn',
@@ -165,7 +175,7 @@ const transform = (
   sourceMap: boolean
 ) => {
   return new Promise((resolve, reject) => {
-    const resource = pathResolve(contextDir, name)
+    const resource = ensureWithinContextDir(pathResolve(contextDir, name))
     const resourceDir = dirname(resource)
 
     const loadersWithOptions = loaders.map((loader) =>
@@ -199,10 +209,11 @@ const transform = (
           },
           fs: {
             readFile(p: string, optionsOrCb: any, maybeCb: any) {
+              const resolvedP = ensureWithinContextDir(pathResolve(p))
               ipc
                 .sendRequest({
                   type: 'trackFileRead',
-                  file: relative(contextDir, pathResolve(p)),
+                  file: relative(contextDir, resolvedP),
                 })
                 .then(
                   () => {
