@@ -846,6 +846,10 @@ fn main() -> Result<()> {
         bail!("Not a directory: {}", db_path.display());
     }
 
+    let db_path = db_path
+        .canonicalize()
+        .context("Failed to resolve database path")?;
+
     // Collect SST info grouped by family
     let family_sst_info = collect_sst_info(&db_path)?;
 
