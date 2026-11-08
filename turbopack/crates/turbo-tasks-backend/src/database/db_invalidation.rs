@@ -157,7 +157,9 @@ pub(crate) fn cleanup_db(base_path: &Path) -> anyhow::Result<()> {
 }
 
 fn cleanup_db_inner(base_path: &Path) -> io::Result<()> {
-    let Ok(contents) = read_dir(base_path) else {
+    let canonical_base = base_path.canonicalize()?;
+
+    let Ok(contents) = read_dir(&canonical_base) else {
         return Ok(());
     };
 
@@ -165,6 +167,17 @@ fn cleanup_db_inner(base_path: &Path) -> io::Result<()> {
     for entry in contents {
         let entry = entry?;
         if entry.file_name() != INVALIDATION_MARKER {
+            // Guard against symlinks escaping the cache directory
+            let canonical_entry = entry.path().canonicalize()?;
+            if !canonical_entry.starts_with(&canonical_base) {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidInput,
+                    format!(
+                        "Refusing to delete entry that resolves outside the cache directory: {:?}",
+                        entry.path()
+                    ),
+                ));
+            }
             if entry.file_type()?.is_dir() {
                 fs::remove_dir_all(entry.path())?;
             } else {
@@ -174,6 +187,6 @@ fn cleanup_db_inner(base_path: &Path) -> io::Result<()> {
     }
 
     // delete the invalidation marker last, once we're sure everything is cleaned up
-    fs::remove_file(base_path.join(INVALIDATION_MARKER))?;
+    fs::remove_file(canonical_base.join(INVALIDATION_MARKER))?;
     Ok(())
 }
