@@ -609,11 +609,22 @@ impl DiskFileSystem {
     }
 
     pub fn to_sys_path(&self, fs_path: &FileSystemPath) -> PathBuf {
-        let path = self.inner.root_path();
+        let root = self.inner.root_path();
         if fs_path.path.is_empty() {
-            path.to_path_buf()
+            root.to_path_buf()
         } else {
-            path.join(&*unix_to_sys(&fs_path.path))
+            let joined = root.join(&*unix_to_sys(&fs_path.path));
+            let normalized = match joined.normalize_lexically() {
+                Ok(p) => p,
+                Err(_) => joined,
+            };
+            assert!(
+                normalized.starts_with(root),
+                "path traversal detected: {:?} escapes root {:?}",
+                normalized,
+                root,
+            );
+            normalized
         }
     }
 }
