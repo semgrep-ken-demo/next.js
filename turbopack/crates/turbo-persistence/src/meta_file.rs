@@ -267,7 +267,16 @@ impl MetaFile {
     }
 
     fn open_internal(db_path: PathBuf, sequence_number: u32, path: &Path) -> Result<Self> {
-        let file = File::open(path).context("Failed to open meta file")?;
+        let canonical_base = db_path
+            .canonicalize()
+            .context("Failed to resolve database directory")?;
+        let canonical_path = path
+            .canonicalize()
+            .context("Failed to resolve meta file path")?;
+        if !canonical_path.starts_with(&canonical_base) {
+            bail!("Meta file path escapes database directory");
+        }
+        let file = File::open(&canonical_path).context("Failed to open meta file")?;
         let mmap = unsafe { MmapOptions::new().map(&file) }.context("Failed to mmap")?;
         #[cfg(unix)]
         mmap.advise(memmap2::Advice::Random)
