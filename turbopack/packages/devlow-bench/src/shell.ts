@@ -191,7 +191,7 @@ export function command(
   } = {}
 ): Command {
   const process = spawn(command, args, {
-    shell: true,
+    shell: false,
     ...options,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
