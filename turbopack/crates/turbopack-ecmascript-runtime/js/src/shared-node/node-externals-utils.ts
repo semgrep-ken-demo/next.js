@@ -26,7 +26,14 @@ const ABSOLUTE_ROOT = path.resolve(__filename, relativePathToDistRoot)
  */
 function resolveAbsolutePath(modulePath?: string): string {
   if (modulePath) {
-    return path.join(ABSOLUTE_ROOT, modulePath)
+    const resolved = path.resolve(ABSOLUTE_ROOT, modulePath)
+    const normalizedRoot = ABSOLUTE_ROOT.endsWith(path.sep)
+      ? ABSOLUTE_ROOT
+      : ABSOLUTE_ROOT + path.sep
+    if (resolved !== ABSOLUTE_ROOT && !resolved.startsWith(normalizedRoot)) {
+      throw new Error('#{modulePath} is outside the root directory')
+    }
+    return resolved
   }
   return ABSOLUTE_ROOT
 }
