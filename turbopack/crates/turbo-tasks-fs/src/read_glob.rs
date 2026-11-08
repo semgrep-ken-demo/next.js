@@ -247,21 +247,33 @@ pub mod tests {
         target: Q,
         path: P,
     ) -> std::io::Result<()> {
-        assert!(target.as_ref().is_absolute());
-        let _ = std::fs::remove_dir(&path);
-        let _ = std::fs::remove_file(&path);
+        let target = target.as_ref();
+        let path = path.as_ref();
+        assert!(target.is_absolute());
+        assert!(path.is_absolute());
+
+        let parent = path
+            .parent()
+            .expect("symlink path must have a parent directory");
+        let file_name = path
+            .file_name()
+            .expect("symlink path must have a file name");
+        let safe_path = parent.canonicalize()?.join(file_name);
+
+        let _ = std::fs::remove_dir(&safe_path);
+        let _ = std::fs::remove_file(&safe_path);
 
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(target, path)
+            std::os::unix::fs::symlink(target, &safe_path)
         }
         #[cfg(windows)]
         {
-            let metadata = std::fs::metadata(&target).ok();
+            let metadata = std::fs::metadata(target).ok();
             if metadata.is_none_or(|m| m.is_file()) {
-                std::os::windows::fs::symlink_file(target, path)
+                std::os::windows::fs::symlink_file(target, &safe_path)
             } else {
-                std::os::windows::fs::junction_point(target, path)
+                std::os::windows::fs::junction_point(target, &safe_path)
             }
         }
     }
