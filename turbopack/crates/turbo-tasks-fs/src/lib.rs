@@ -2224,6 +2224,14 @@ pub struct File {
 impl File {
     /// Reads a [File] from the given path
     fn from_path(p: &Path) -> io::Result<Self> {
+        for component in p.components() {
+            if matches!(component, std::path::Component::ParentDir) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "path contains '..' traversal component",
+                ));
+            }
+        }
         let mut file = std::fs::File::open(p)?;
         let metadata = file.metadata()?;
 
