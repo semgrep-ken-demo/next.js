@@ -80,6 +80,8 @@ pub mod invalidation_reasons {
 /// In most cases, you should prefer a higher-level API like [`crate::BackingStorage::invalidate`]
 /// to this one.
 pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Result<()> {
+    let canonical_path = fs::canonicalize(base_path);
+    let base_path = canonical_path.as_deref().unwrap_or(base_path);
     match File::create_new(base_path.join(INVALIDATION_MARKER)) {
         Ok(file) => {
             let mut writer = BufWriter::new(file);
@@ -115,6 +117,10 @@ pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Resu
 pub(crate) fn check_db_invalidation_and_cleanup(
     base_path: &Path,
 ) -> anyhow::Result<StartupCacheState> {
+    // Canonicalize to prevent path traversal. If the path doesn't exist yet, canonicalize will
+    // fail, but that's fine — we handle NotFound below.
+    let canonical_path = fs::canonicalize(base_path);
+    let base_path = canonical_path.as_deref().unwrap_or(base_path);
     match File::open(base_path.join(INVALIDATION_MARKER)) {
         Ok(file) => {
             // Best-effort: Try to read the reason_code from the file, if the file format is
@@ -148,6 +154,8 @@ pub(crate) fn check_db_invalidation_and_cleanup(
 /// You should not run this if the database has not yet been invalidated, as this operation is not
 /// atomic and could result in a partially-deleted and corrupted database.
 pub(crate) fn cleanup_db(base_path: &Path) -> anyhow::Result<()> {
+    let base_path = &fs::canonicalize(base_path)
+        .with_context(|| format!("Failed to canonicalize path: {base_path:?}"))?;
     cleanup_db_inner(base_path).with_context(|| {
         format!(
             "Unable to remove invalid database. If this issue persists you can work around by \
