@@ -72,7 +72,7 @@ async function withRequestMetrics(
             for (const arg of message.args()) {
               args.push(await arg.jsonValue())
             }
-            console.log(`[${type}] ${text}`, ...args)
+            console.log('[%s] %s', type, text, ...args)
           } catch {
             // Ignore
           }
