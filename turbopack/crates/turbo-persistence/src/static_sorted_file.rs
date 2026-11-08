@@ -219,6 +219,10 @@ impl StaticSortedFile {
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
         let path = db_path.join(&filename);
+        ensure!(
+            path.starts_with(db_path),
+            "SST path escapes database directory"
+        );
         let file = File::open(&path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
@@ -781,6 +785,10 @@ impl StaticSortedFileIter {
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
         let path = db_path.join(&filename);
+        ensure!(
+            path.starts_with(db_path),
+            "SST path escapes database directory"
+        );
         let file = File::open(&path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
