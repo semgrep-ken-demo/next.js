@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Component, Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -71,9 +74,14 @@ impl CustomTransformer for RelayTransformer {
                 .context("Expected relative path to relay artifact")?,
         );
 
+        let sanitized_file_name: PathBuf = Path::new(ctx.file_name_str)
+            .components()
+            .filter(|c| !matches!(c, Component::ParentDir))
+            .collect();
+
         program.mutate(swc_relay::relay(
             self.config.clone(),
-            FileName::Real(PathBuf::from(ctx.file_name_str)),
+            FileName::Real(sanitized_file_name),
             path_to_proj,
             // [TODO]: pages_dir comes through next-swc-loader
             // https://github.com/vercel/next.js/blob/ea472e8058faea8ebdab2ef6d3aab257a1f0d11c/packages/next/src/build/webpack-config.ts#L792
