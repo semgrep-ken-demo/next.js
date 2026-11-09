@@ -38,7 +38,8 @@ export function UnrenderedSegmentInfo({
         () => {},
         (cause) => {
           console.error(
-            `Failed to open file "${firstMissingFile}" in your editor. Cause:`,
+            'Failed to open file "%s" in your editor. Cause:',
+            firstMissingFile,
             cause
           )
         }
