@@ -10,6 +10,14 @@
 import fs from 'fs'
 import path from 'path'
 
+function safePath(dir: string, fileName: string): string {
+  const resolved = path.resolve(dir, fileName)
+  if (!resolved.startsWith(path.resolve(dir) + path.sep) && resolved !== path.resolve(dir)) {
+    throw new Error(`Path traversal detected: ${fileName} escapes ${dir}`)
+  }
+  return resolved
+}
+
 export const AGENT_RULES_START_MARKER = '<!-- BEGIN:nextjs-agent-rules -->'
 export const AGENT_RULES_END_MARKER = '<!-- END:nextjs-agent-rules -->'
 
@@ -43,10 +51,10 @@ export interface AgentFilesResult {
  * managed agent-rules marker.
  */
 export function hasAgentRulesInstalled(dir: string): boolean {
-  const agentsContent = tryReadFile(path.join(dir, 'AGENTS.md'))
+  const agentsContent = tryReadFile(safePath(dir, 'AGENTS.md'))
   if (agentsContent?.includes(AGENT_RULES_START_MARKER)) return true
 
-  const claudeContent = tryReadFile(path.join(dir, 'CLAUDE.md'))
+  const claudeContent = tryReadFile(safePath(dir, 'CLAUDE.md'))
   if (claudeContent?.includes(AGENT_RULES_START_MARKER)) return true
 
   return false
@@ -65,8 +73,8 @@ export function hasAgentRulesInstalled(dir: string): boolean {
  * reported as `unchanged`.
  */
 export function writeAgentFiles(projectDir: string): AgentFilesResult {
-  const agentsMdPath = path.join(projectDir, 'AGENTS.md')
-  const claudeMdPath = path.join(projectDir, 'CLAUDE.md')
+  const agentsMdPath = safePath(projectDir, 'AGENTS.md')
+  const claudeMdPath = safePath(projectDir, 'CLAUDE.md')
   const block = buildAgentRulesBlock()
 
   const agentsMdExists = fs.existsSync(agentsMdPath)
