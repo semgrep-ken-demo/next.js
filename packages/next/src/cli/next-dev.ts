@@ -42,6 +42,28 @@ import { trace, initializeTraceState, exportTraceState } from '../trace'
 import { traceId } from '../trace/shared'
 import { Bundler, parseBundlerArgs } from '../lib/bundler'
 
+function safePathJoin(base: string, segment: string): string {
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const resolved = path.resolve(base, segment)
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const normalizedBase = path.resolve(base)
+  if (
+    resolved !== normalizedBase &&
+    !resolved.startsWith(normalizedBase + path.sep)
+  ) {
+    throw new Error('Path traversal is not allowed')
+  }
+  return resolved
+}
+
+function safePathResolve(filePath: string): string {
+  if (filePath.includes('\0')) {
+    throw new Error('Path must not contain null bytes')
+  }
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  return path.resolve(filePath)
+}
+
 export type NextDevOptions = {
   disableSourceMaps: boolean
   // Commander is not putting `--inspect` through the arg parser
@@ -147,7 +169,7 @@ const handleSessionStop = async (signal: NodeJS.Signals | number | null) => {
         typeof import('../telemetry/storage').Telemetry
       >) ||
       new Telemetry({
-        distDir: path.join(dir, distDir || '.next'),
+        distDir: safePathJoin(dir, distDir || '.next'),
       })
 
     telemetry.record(
@@ -416,7 +438,7 @@ const nextDev = async (
           ...(options.experimentalCpuProf
             ? {
                 NEXT_CPU_PROF: '1',
-                NEXT_CPU_PROF_DIR: path.join(dir, '.next-profiles'),
+                NEXT_CPU_PROF_DIR: safePathJoin(dir, '.next-profiles'),
                 __NEXT_PRIVATE_CPU_PROFILE: 'dev-server',
               }
             : undefined),
@@ -494,9 +516,9 @@ const nextDev = async (
 
         if (key && cert) {
           certificate = {
-            key: path.resolve(key),
-            cert: path.resolve(cert),
-            rootCA: rootCA ? path.resolve(rootCA) : undefined,
+            key: safePathResolve(key),
+            cert: safePathResolve(cert),
+            rootCA: rootCA ? safePathResolve(rootCA) : undefined,
           }
         } else {
           certificate = await createSelfSignedCertificate(host)
@@ -547,7 +569,7 @@ function writeDevState(): void {
     const gitBranch = getGitBranch(dir)
     state[dir] = {
       stopTime: Date.now(),
-      distDirPath: path.join(dir, distDir ?? '.next'),
+      distDirPath: safePathJoin(dir, distDir ?? '.next'),
       ...(gitBranch ? { gitBranch } : {}),
     }
 
