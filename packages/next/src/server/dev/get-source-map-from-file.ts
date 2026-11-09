@@ -69,9 +69,17 @@ export async function getSourceMapFromFile(
     }
   }
 
-  const sourceMapFilename = path.resolve(
-    path.dirname(filename),
-    decodeURIComponent(sourceUrl)
+  const decodedSourceUrl = decodeURIComponent(sourceUrl)
+  const normalizedSourceUrl = path.normalize(decodedSourceUrl)
+
+  if (path.isAbsolute(normalizedSourceUrl) || normalizedSourceUrl.startsWith('..')) {
+    throw new Error(
+      `Source map URL for ${filename} attempts to traverse outside its directory.`
+    )
+  }
+
+  const sourceMapFilename = url.fileURLToPath(
+    new URL(normalizedSourceUrl, url.pathToFileURL(filename))
   )
 
   try {
