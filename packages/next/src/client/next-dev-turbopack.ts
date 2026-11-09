@@ -38,7 +38,7 @@ initialize({
       )
 
       Promise.all(chunkPromises).catch((err) =>
-        console.error('failed to load chunks for page ' + page, err)
+        console.error('failed to load chunks for page %s', page, err)
       )
     }
 
