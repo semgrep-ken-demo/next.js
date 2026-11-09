@@ -109,6 +109,45 @@ function normalizeNextConfigZodErrors(
   return [warnings, fatalErrors]
 }
 
+function isSafeObjectKey(key: string): boolean {
+  return key !== '__proto__' && key !== 'constructor' && key !== 'prototype'
+}
+
+function safeGetNestedProperty(obj: any, keys: string[]): any | undefined {
+  if (!keys.every(isSafeObjectKey)) return undefined
+  return keys.reduce(
+    (current: any, key: string) => {
+      if (
+        current == null ||
+        typeof current !== 'object' ||
+        !Object.prototype.hasOwnProperty.call(current, key) ||
+        current[key] === undefined
+      ) {
+        return undefined
+      }
+      return current[key]
+    },
+    obj
+  )
+}
+
+function safeSetNestedProperty(obj: any, keys: string[], value: any): boolean {
+  if (!keys.every(isSafeObjectKey)) return false
+  const pathKeys = keys.slice(0, -1)
+  const lastKey = keys[keys.length - 1]
+  const parent = pathKeys.reduce(
+    (current: any, segment: string) => {
+      if (!Object.prototype.hasOwnProperty.call(current, segment)) {
+        current[segment] = Object.create(null)
+      }
+      return current[segment]
+    },
+    obj
+  )
+  parent[lastKey] = value
+  return true
+}
+
 export function warnOptionHasBeenDeprecated(
   config: NextConfig,
   nestedPropertyKey: string,
@@ -117,17 +156,8 @@ export function warnOptionHasBeenDeprecated(
 ): boolean {
   let hasWarned = false
   if (!silent) {
-    let current = config
-    let found = true
-    const nestedPropertyKeys = nestedPropertyKey.split('.')
-    for (const key of nestedPropertyKeys) {
-      if ((current as any)[key] !== undefined) {
-        current = (current as any)[key]
-      } else {
-        found = false
-        break
-      }
-    }
+    const found =
+      safeGetNestedProperty(config, nestedPropertyKey.split('.')) !== undefined
     if (found) {
       Log.warnOnce(reason)
       hasWarned = true
@@ -243,16 +273,8 @@ export function warnOptionHasBeenMovedOutOfExperimental(
       )
     }
 
-    let current = config
-    const newKeys = newKey.split('.')
-    while (newKeys.length > 1) {
-      const key = newKeys.shift()!
-      ;(current as any)[key] = (current as any)[key] || {}
-      current = (current as any)[key]
-    }
-    ;(current as any)[newKeys.shift()!] = (config.experimental as any)[
-      oldExperimentalKey
-    ]
+    const value = (config.experimental as any)[oldExperimentalKey]
+    safeSetNestedProperty(config, newKey.split('.'), value)
   }
 
   return config
@@ -266,15 +288,9 @@ function warnCustomizedOption(
   configFileName: string,
   silent: boolean
 ) {
-  const segs = key.split('.')
-  let current = config
-
-  while (segs.length >= 1) {
-    const seg = segs.shift()!
-    if (!(seg in current)) {
-      return
-    }
-    current = (current as any)[seg]
+  const current = safeGetNestedProperty(config, key.split('.'))
+  if (current === undefined) {
+    return
   }
 
   if (!silent && current !== defaultValue) {
