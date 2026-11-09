@@ -197,6 +197,10 @@ async function exportAppImpl(
 ): Promise<ExportAppResult | null> {
   dir = resolve(dir)
 
+  if (!dir || dir === sep) {
+    throw new ExportError('Invalid project directory.')
+  }
+
   // attempt to load global env values so they are available in next.config.js
   span.traceChild('load-dotenv').traceFn(() => loadEnvConfig(dir, false, Log))
 
@@ -210,7 +214,13 @@ async function exportAppImpl(
       })
     ))
 
-  const distDir = join(dir, nextConfig.distDir)
+  const distDir = resolve(dir, nextConfig.distDir)
+
+  if (!distDir.startsWith(dir + sep) && distDir !== dir) {
+    throw new ExportError(
+      `Invalid distDir (${nextConfig.distDir}). It must be contained within the project directory.`
+    )
+  }
   const telemetry = options.buildExport ? null : new Telemetry({ distDir })
 
   if (telemetry) {
