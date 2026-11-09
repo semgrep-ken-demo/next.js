@@ -119,7 +119,9 @@ module.exports = function (task) {
 
       const swcOptions = isClient ? swcClientOptions : swcServerOptions
 
-      const filePath = path.join(file.dir, file.base)
+      const safeDir = file.dir.replace(/\.\./g, '')
+      const safeBase = file.base.replace(/\.\./g, '')
+      const filePath = path.join(safeDir, safeBase)
       const fullFilePath = path.join(__dirname, filePath)
       const distFilePath = path.dirname(
         // we must strip src from filePath as it isn't carried into
@@ -132,7 +134,7 @@ module.exports = function (task) {
       )
 
       const options = {
-        filename: path.join(file.dir, file.base),
+        filename: filePath,
         sourceMaps: true,
         inlineSourcesContent: true,
         sourceFileName: path.relative(distFilePath, fullFilePath),
