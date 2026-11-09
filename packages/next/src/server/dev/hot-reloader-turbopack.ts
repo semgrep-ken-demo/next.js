@@ -1,7 +1,7 @@
 import type { Socket } from 'net'
 import { mkdir, writeFile } from 'fs/promises'
 import * as inspector from 'inspector'
-import { join, extname, relative } from 'path'
+import { join, extname, relative, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 
 import ws from 'next/dist/compiled/ws'
@@ -259,6 +259,18 @@ function setupServerHmr(
   return serverHmrSubscriptions
 }
 
+function safeJoin(base: string, ...segments: string[]): string {
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const resolved = resolve(base, ...segments)
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  if (!resolved.startsWith(resolve(base) + sep) && resolved !== resolve(base)) {
+    throw new Error(
+      `Path traversal detected: joined path escapes base directory`
+    )
+  }
+  return resolved
+}
+
 /**
  * Replaces turbopack:///[project] with the specified project in the `source` field.
  */
@@ -273,7 +285,7 @@ function rewriteTurbopackSources(
   } else {
     for (let i = 0; i < sourceMap.sources.length; i++) {
       sourceMap.sources[i] = pathToFileURL(
-        join(
+        safeJoin(
           projectRoot,
           sourceMap.sources[i].replace(/turbopack:\/\/\/\[project\]/, '')
         )
@@ -601,7 +613,7 @@ export async function createHotReloaderTurbopack(
     }
 
     const serverPaths = writtenEndpoint.serverPaths.map(({ path: p }) =>
-      join(distDir, p)
+      safeJoin(distDir, p)
     )
 
     const { type: entryType } = splitEntryKey(key)
@@ -994,10 +1006,10 @@ export async function createHotReloaderTurbopack(
     }
   }
 
-  await mkdir(join(distDir, 'server'), { recursive: true })
-  await mkdir(join(distDir, 'static', buildId), { recursive: true })
+  await mkdir(safeJoin(distDir, 'server'), { recursive: true })
+  await mkdir(safeJoin(distDir, 'static', buildId), { recursive: true })
   await writeFile(
-    join(distDir, 'package.json'),
+    safeJoin(distDir, 'package.json'),
     JSON.stringify(
       {
         type: 'commonjs',
@@ -1950,7 +1962,7 @@ export async function createHotReloaderTurbopack(
       clear: async () => {
         // Clear Node's require cache of all Turbopack-built modules
         const chunkPaths = [...(serverHmrSubscriptions?.keys() ?? [])].map(
-          (chunkPath) => join(distDir, chunkPath)
+          (chunkPath) => safeJoin(distDir, chunkPath)
         )
         deleteCache(chunkPaths)
 
