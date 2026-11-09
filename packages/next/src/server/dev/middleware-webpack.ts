@@ -248,6 +248,12 @@ export async function createOriginalStackFrame({
       : sourcePosition.source) || source.moduleURL
   )
   const filePath = path.resolve(rootDirectory, sourcePath)
+  if (
+    !filePath.startsWith(rootDirectory + path.sep) &&
+    filePath !== rootDirectory
+  ) {
+    return null
+  }
   const resolvedFilePath = path.relative(rootDirectory, filePath)
 
   const traced: IgnorableStackFrame = {
@@ -651,6 +657,13 @@ export function getOverlayMiddleware(options: {
           isSrcDir ? 'src' : '',
           relativeFilePath
         )
+        const resolvedAppPath = path.resolve(rootDirectory, appPath)
+        if (
+          !resolvedAppPath.startsWith(rootDirectory + path.sep) &&
+          resolvedAppPath !== rootDirectory
+        ) {
+          return middlewareResponse.badRequest(res)
+        }
         openEditorResult = await openFileInEditor(appPath, 1, 1, rootDirectory)
       } else {
         // TODO: How do we differentiate layers and actual file paths with round brackets?
