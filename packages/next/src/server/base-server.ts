@@ -490,8 +490,10 @@ export default abstract class Server<
       this.fetchHostname = formatHostname(this.hostname)
     }
     this.port = port
+    // distDir is validated against path traversal in config.ts assignDefaultsAndValidate
     this.distDir = path.join(
       /* turbopackIgnore: true */ this.dir,
+      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
       this.nextConfig.distDir
     )
     this.publicDir = this.getPublicDir()

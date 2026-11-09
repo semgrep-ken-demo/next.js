@@ -341,6 +341,15 @@ function assignDefaultsAndValidate(
             `Invalid distDir provided, distDir can not be an empty string. Please remove this config or set it to undefined`
           )
         }
+        // Prevent path traversal: distDir must not escape the project root
+        if (
+          isAbsolute(userDistDir) ||
+          !resolve(dir, userDistDir).startsWith(resolve(dir) + '/')
+        ) {
+          throw new Error(
+            `Invalid distDir provided, distDir must be a relative path that stays within the project directory. "${userDistDir}" is not allowed.`
+          )
+        }
       }
 
       if (key === 'pageExtensions') {
