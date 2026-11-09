@@ -83,7 +83,12 @@ export async function uploadTraceToBlob(
   options: UploadTraceOptions
 ): Promise<void> {
   const dir = options.directory || process.cwd()
-  const profilesDir = path.join(dir, '.next-profiles')
+  const resolvedDir = path.resolve(dir)
+  const profilesDir = path.resolve(resolvedDir, '.next-profiles')
+  if (!profilesDir.startsWith(resolvedDir + path.sep)) {
+    console.error('Error: Invalid profiles directory path.')
+    process.exit(1)
+  }
 
   let entries: string[]
   try {
@@ -120,7 +125,11 @@ export async function uploadTraceToBlob(
   let uploadedCount = 0
 
   for (const file of uploadableFiles) {
-    const filePath = path.join(profilesDir, file)
+    const filePath = path.resolve(profilesDir, file)
+    if (!filePath.startsWith(profilesDir + path.sep)) {
+      console.warn(`Skipping ${file}: path escapes profiles directory.`)
+      continue
+    }
 
     const stat = await fs.stat(filePath)
     if (stat.size === 0) {
