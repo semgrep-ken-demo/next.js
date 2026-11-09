@@ -17,7 +17,12 @@ export class FileLogger {
   private mcpServerEnabled: boolean = false
 
   public initialize(distDir: string, mcpServerEnabled: boolean): void {
-    this.logFilePath = path.join(distDir, 'logs', `next-development.log`)
+    const resolvedDistDir = path.resolve(distDir)
+    const logFilePath = path.join(resolvedDistDir, 'logs', 'next-development.log')
+    if (!logFilePath.startsWith(resolvedDistDir + path.sep)) {
+      throw new Error('Invalid distDir: path traversal detected')
+    }
+    this.logFilePath = logFilePath
     this.mcpServerEnabled = mcpServerEnabled
 
     if (this.isInitialized) {
