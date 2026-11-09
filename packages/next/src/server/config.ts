@@ -2364,9 +2364,9 @@ function cloneObject(obj: any): any {
     return obj
   }
 
-  // RegExp → clone via constructor
+  // RegExp — reuse the reference; pattern and flags are immutable.
   if (obj instanceof RegExp) {
-    return new RegExp(obj.source, obj.flags)
+    return obj
   }
 
   // Function → just reuse the function reference
