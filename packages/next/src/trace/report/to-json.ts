@@ -124,7 +124,7 @@ export function createJsonReporter(options: {
       batch = batcher(async (events: TraceEvent[]) => {
         if (!writeStream) {
           await fs.promises.mkdir(distDir, { recursive: true })
-          const file = path.join(distDir, options.filename)
+          const file = path.join(distDir, path.basename(options.filename))
           const limit =
             typeof options.sizeLimit === 'function'
               ? options.sizeLimit(phase)
