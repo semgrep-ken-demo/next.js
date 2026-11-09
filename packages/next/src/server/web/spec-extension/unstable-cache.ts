@@ -232,7 +232,8 @@ export function unstable_cache<T extends Callback>(
               // so bugs can be reported
               // @TODO the invocation key can have sensitive data in it. we should not log this entire object
               console.error(
-                `Invariant invalid cacheEntry returned for ${invocationKey}`
+                'Invariant invalid cacheEntry returned for %s',
+                invocationKey
               )
               // will fall through to generating a new cache entry below
             } else {
@@ -268,7 +269,8 @@ export function unstable_cache<T extends Callback>(
                     .catch((err) => {
                       // @TODO This error handling seems wrong. We swallow the error?
                       console.error(
-                        `revalidating cache with key: ${invocationKey}`,
+                        'revalidating cache with key: %s',
+                        invocationKey,
                         err
                       )
                       // Return the stale value on error for foreground revalidation
@@ -356,7 +358,8 @@ export function unstable_cache<T extends Callback>(
               // @TODO why do we warn this way? Should this just be an error? How are these errors surfaced
               // so bugs can be reported
               console.error(
-                `Invariant invalid cacheEntry returned for ${invocationKey}`
+                'Invariant invalid cacheEntry returned for %s',
+                invocationKey
               )
               // will fall through to generating a new cache entry below
             } else if (!cacheEntry.isStale) {
