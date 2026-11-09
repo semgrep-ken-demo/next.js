@@ -29,7 +29,12 @@ const nextPostBuild = async (
     return
   }
 
-  const distDir = path.join(dir, config.distDir)
+  const distDir = path.resolve(dir, config.distDir)
+  if (!distDir.startsWith(dir + path.sep) && distDir !== dir) {
+    printAndExit(
+      `> Invalid distDir: "${config.distDir}" resolves outside of the project root`
+    )
+  }
   const cachePath = path.join(distDir, 'cache', 'turbopack')
 
   if (!existsSync(cachePath)) {
