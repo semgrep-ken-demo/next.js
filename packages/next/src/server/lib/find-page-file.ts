@@ -6,7 +6,6 @@ import { promises as fsPromises } from 'fs'
 import { warn } from '../../build/output/log'
 import { cyan } from '../../lib/picocolors'
 import { isMetadataRouteFile } from '../../lib/metadata/is-metadata-route'
-import { escapeStringRegexp } from '../../shared/lib/escape-regexp'
 import type { PageExtensions } from '../../build/page-extensions-type'
 
 async function isTrueCasePagePath(pagePath: string, pagesDir: string) {
@@ -80,30 +79,39 @@ export function createValidFileMatcher(
   pageExtensions: PageExtensions,
   appDirPath: string | undefined
 ) {
-  // Helper to create extension regex pattern
-  const extPattern = `(?:${pageExtensions
-    .map((extension) => escapeStringRegexp(extension))
-    .join('|')})`
+  const extensionSet = new Set(pageExtensions)
 
-  // Pattern factory for "leaf" files that can appear at start of path or after separator
-  // e.g., 'page.tsx', '/path/page.tsx', '\\path\\route.js'
-  const createLeafPattern = (fileNames: string[]): RegExp => {
-    const names =
-      fileNames.length === 1 ? fileNames[0] : `(${fileNames.join('|')})`
-    return new RegExp(`(^${names}|[\\\\/]${names})\\.${extPattern}$`)
+  function hasValidExtension(filePath: string): boolean {
+    const dotIndex = filePath.lastIndexOf('.')
+    if (dotIndex === -1) return false
+    return extensionSet.has(filePath.slice(dotIndex + 1))
   }
 
-  // Pattern factory for root-only files (no path separator allowed)
-  const createRootOnlyPattern = (fileName: string): RegExp =>
-    new RegExp(`^${fileName}\\.${extPattern}$`)
+  function isLeafFile(filePath: string, fileNames: string[]): boolean {
+    if (!hasValidExtension(filePath)) return false
+    const dotIndex = filePath.lastIndexOf('.')
+    const withoutExt = filePath.slice(0, dotIndex)
+    for (const name of fileNames) {
+      if (withoutExt === name) return true
+      if (
+        withoutExt.endsWith('/' + name) ||
+        withoutExt.endsWith('\\' + name)
+      ) {
+        return true
+      }
+    }
+    return false
+  }
 
-  // All file matching patterns
-  const validExtensionFileRegex = new RegExp(`\\.${extPattern}$`)
-  const leafOnlyPageFileRegex = createLeafPattern(['page', 'route'])
-  const leafOnlyRouteFileRegex = createLeafPattern(['route'])
-  const leafOnlyLayoutFileRegex = createLeafPattern(['layout'])
-  const leafOnlyDefaultFileRegex = createLeafPattern(['default'])
-  const rootNotFoundFileRegex = createRootOnlyPattern('not-found')
+  function isRootOnlyFile(filePath: string, fileName: string): boolean {
+    if (!hasValidExtension(filePath)) return false
+    const dotIndex = filePath.lastIndexOf('.')
+    return filePath.slice(0, dotIndex) === fileName
+  }
+  const leafPageNames = ['page', 'route']
+  const leafRouteNames = ['route']
+  const leafLayoutNames = ['layout']
+  const leafDefaultNames = ['default']
   /** TODO-METADATA: support other metadata routes
    *  regex for:
    *
@@ -131,24 +139,23 @@ export function createValidFileMatcher(
   // Determine if the file is leaf node page file or route file under layouts,
   // 'page.<extension>' | 'route.<extension>'
   function isAppRouterPage(filePath: string) {
-    return leafOnlyPageFileRegex.test(filePath) || isMetadataFile(filePath)
+    return isLeafFile(filePath, leafPageNames) || isMetadataFile(filePath)
   }
 
-  // Determine if the file is leaf node route file under app directory
   function isAppRouterRoute(filePath: string) {
-    return leafOnlyRouteFileRegex.test(filePath)
+    return isLeafFile(filePath, leafRouteNames)
   }
 
   function isAppLayoutPage(filePath: string) {
-    return leafOnlyLayoutFileRegex.test(filePath)
+    return isLeafFile(filePath, leafLayoutNames)
   }
 
   function isAppDefaultPage(filePath: string) {
-    return leafOnlyDefaultFileRegex.test(filePath)
+    return isLeafFile(filePath, leafDefaultNames)
   }
 
   function isPageFile(filePath: string) {
-    return validExtensionFileRegex.test(filePath) || isMetadataFile(filePath)
+    return hasValidExtension(filePath) || isMetadataFile(filePath)
   }
 
   function isRootNotFound(filePath: string) {
@@ -159,7 +166,7 @@ export function createValidFileMatcher(
       return false
     }
     const rest = filePath.slice(appDirPath.length + 1)
-    return rootNotFoundFileRegex.test(rest)
+    return isRootOnlyFile(rest, 'not-found')
   }
 
   return {
