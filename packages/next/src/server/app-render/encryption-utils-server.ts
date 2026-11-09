@@ -15,7 +15,7 @@ const EXPIRATION = 1000 * 60 * 60 * 24 * 14 // 14 days
 
 async function writeCache(distDir: string, configValue: string) {
   const cacheBaseDir = getStorageDirectory(distDir)
-  if (!cacheBaseDir) return
+  if (!cacheBaseDir || cacheBaseDir.indexOf('..') !== -1) return
 
   const configPath = path.join(cacheBaseDir, CONFIG_FILE)
   if (!fs.existsSync(cacheBaseDir)) {
@@ -43,7 +43,7 @@ async function loadOrGenerateKey(
 ): Promise<string> {
   const cacheBaseDir = getStorageDirectory(distDir)
 
-  if (!cacheBaseDir) {
+  if (!cacheBaseDir || cacheBaseDir.indexOf('..') !== -1) {
     // There's no persistent storage available. We generate a new key.
     // This also covers development time.
     return await generateKey()
