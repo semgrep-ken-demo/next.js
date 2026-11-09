@@ -25,11 +25,20 @@ export type NextTypegenOptions = {
   dir?: string
 }
 
+function sanitizePath(value: string): string {
+  if (value.includes('..')) {
+    throw new Error(
+      `Path traversal detected: "${value}" contains disallowed sequence`
+    )
+  }
+  return value
+}
+
 const nextTypegen = async (
   _options: NextTypegenOptions,
   directory?: string
 ) => {
-  const baseDir = getProjectDir(directory)
+  const baseDir = sanitizePath(getProjectDir(directory))
 
   // Check if the provided directory exists
   if (!existsSync(baseDir)) {
@@ -38,7 +47,7 @@ const nextTypegen = async (
 
   const nextConfig = await loadConfig(PHASE_PRODUCTION_BUILD, baseDir)
   await installBindings(nextConfig.experimental?.useWasmBinary)
-  const distDir = join(baseDir, nextConfig.distDir)
+  const distDir = join(baseDir, sanitizePath(nextConfig.distDir))
   const { pagesDir, appDir } = findPagesDir(baseDir)
 
   const strictRouteTypes = Boolean(nextConfig.experimental.strictRouteTypes)
