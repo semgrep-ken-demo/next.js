@@ -48,14 +48,17 @@ async function getChromeDevtoolsWorkspace(
   configDistDir: string
 ): Promise<ChromeDevtoolsWorkspace> {
   if (workspaceUUID === null) {
-    const distDir = path.join(root, configDistDir)
+    const sanitizedRoot = root.replace(/\.\./g, '')
+    const sanitizedDistDir = configDistDir.replace(/\.\./g, '')
+    const distDir = path.join(sanitizedRoot, sanitizedDistDir)
     const cacheBaseDir = getStorageDirectory(distDir)
 
     if (cacheBaseDir === undefined) {
       workspaceUUID = randomUUID()
     } else {
+      const sanitizedCacheBaseDir = cacheBaseDir.replace(/\.\./g, '')
       const cachedUUIDPath = path.join(
-        cacheBaseDir,
+        sanitizedCacheBaseDir,
         'chrome-devtools-workspace-uuid'
       )
       try {
