@@ -462,8 +462,12 @@ pub fn project_new(
                     .join(path)
             }
         } else {
+            let sanitized_project_path: PathBuf = Path::new(&*options.project_path)
+                .components()
+                .filter(|c| matches!(c, std::path::Component::Normal(_)))
+                .collect();
             PathBuf::from(&options.root_path)
-                .join(&options.project_path)
+                .join(sanitized_project_path)
                 .join(DIST_PROFILES_DIR_NAME)
                 // use a generic binary extension to hint to random tools not to read it.
                 .join("trace-turbopack.bin")
