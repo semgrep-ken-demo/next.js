@@ -218,7 +218,10 @@ impl StaticSortedFile {
     /// It's lazy read on demand.
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
-        let path = db_path.join(&filename);
+        let safe_name = Path::new(&filename)
+            .file_name()
+            .context("Invalid SST filename")?;
+        let path = db_path.join(safe_name);
         let file = File::open(&path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
@@ -780,7 +783,10 @@ impl StaticSortedFileIter {
     /// eliminating all atomic refcounting during iteration.
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
-        let path = db_path.join(&filename);
+        let safe_name = Path::new(&filename)
+            .file_name()
+            .context("Invalid SST filename")?;
+        let path = db_path.join(safe_name);
         let file = File::open(&path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
