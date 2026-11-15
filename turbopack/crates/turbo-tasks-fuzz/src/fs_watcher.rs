@@ -515,11 +515,16 @@ fn create_directory_tree(
     depth: usize,
     width: usize,
 ) -> anyhow::Result<()> {
+    let canonical_parent = parent.canonicalize()?;
     let mut rng = rand::rng();
     let mut rand_buf = [0; 16];
     for child_id in 0..width {
         let child_name = child_id.to_string();
-        let child_path = parent.join(&child_name);
+        let child_path = canonical_parent.join(&child_name);
+        anyhow::ensure!(
+            child_path.starts_with(&canonical_parent),
+            "path traversal detected: child path escapes parent directory"
+        );
         if depth == 1 {
             let mut f = std::fs::File::create(&child_path)?;
             rng.fill_bytes(&mut rand_buf);
