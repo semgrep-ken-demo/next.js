@@ -616,6 +616,19 @@ impl DiskFileSystem {
             path.join(&*unix_to_sys(&fs_path.path))
         }
     }
+
+    fn to_sys_path_validated(&self, fs_path: &FileSystemPath) -> Result<PathBuf> {
+        let full_path = self.to_sys_path(fs_path);
+        let root = self.inner.root_path();
+        if !full_path.normalize_lexically()?.starts_with(root) {
+            bail!(
+                "path {:?} escapes the filesystem root {:?}",
+                full_path,
+                root,
+            );
+        }
+        Ok(full_path)
+    }
 }
 
 #[allow(dead_code, reason = "we need to hold onto the locks")]
@@ -718,7 +731,7 @@ impl FileSystem for DiskFileSystem {
         if self.inner.is_path_denied(&fs_path) {
             return Ok(FileContent::NotFound.cell());
         }
-        let full_path = self.to_sys_path(&fs_path);
+        let full_path = self.to_sys_path_validated(&fs_path)?;
 
         self.inner.register_read_invalidator(&full_path).await?;
 
@@ -744,7 +757,7 @@ impl FileSystem for DiskFileSystem {
         if self.inner.is_path_denied(&fs_path) {
             return Ok(RawDirectoryContent::not_found());
         }
-        let full_path = self.to_sys_path(&fs_path);
+        let full_path = self.to_sys_path_validated(&fs_path)?;
 
         self.inner.register_dir_invalidator(&full_path).await?;
 
@@ -832,7 +845,7 @@ impl FileSystem for DiskFileSystem {
         if self.inner.is_path_denied(&fs_path) {
             return Ok(LinkContent::NotFound.cell());
         }
-        let full_path = self.to_sys_path(&fs_path);
+        let full_path = self.to_sys_path_validated(&fs_path)?;
 
         self.inner.register_read_invalidator(&full_path).await?;
 
@@ -931,7 +944,7 @@ impl FileSystem for DiskFileSystem {
         if this.inner.is_path_denied(&fs_path) {
             turbobail!("Cannot write to denied path: {fs_path}");
         }
-        let full_path = this.to_sys_path(&fs_path);
+        let full_path = this.to_sys_path_validated(&fs_path)?;
 
         // Persist the file content so it is stored in the persistent cache.
         // Since FileContent uses serialization = "hash", persisting it here ensures the full
@@ -1162,7 +1175,7 @@ impl FileSystem for DiskFileSystem {
         if this.inner.is_path_denied(&fs_path) {
             turbobail!("Cannot write link to denied path: {fs_path}");
         }
-        let full_path = this.to_sys_path(&fs_path);
+        let full_path = this.to_sys_path_validated(&fs_path)?;
 
         let content_hash = u128::from_le_bytes(hash_xxh3_hash128(&*target.await?));
 
@@ -1470,7 +1483,7 @@ impl FileSystem for DiskFileSystem {
 
     #[turbo_tasks::function(fs, session_dependent)]
     async fn metadata(&self, fs_path: FileSystemPath) -> Result<Vc<FileMeta>> {
-        let full_path = self.to_sys_path(&fs_path);
+        let full_path = self.to_sys_path_validated(&fs_path)?;
 
         // Check if path is denied - if so, return an error (metadata shouldn't be readable)
         if self.inner.is_path_denied(&fs_path) {
