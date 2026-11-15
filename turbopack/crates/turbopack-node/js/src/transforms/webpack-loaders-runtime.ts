@@ -63,7 +63,13 @@ export function evaluateBundle(result: ImportModuleResult): any {
     if (request.startsWith('/')) {
       resolved = request
     } else if (request.startsWith('./') || request.startsWith('../')) {
-      resolved = path.resolve(path.dirname(fromPath), request)
+      const base = path.dirname(fromPath)
+      resolved = path.normalize(base + '/' + request)
+      if (!resolved.startsWith('/')) {
+        throw new Error(
+          `importModule: path traversal detected: ${request} (required from ${fromPath})`
+        )
+      }
     } else {
       // Intercept 'fs' to return the patched version when binary
       // assets are present (needed for WASM loading)
