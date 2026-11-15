@@ -720,6 +720,10 @@ impl FileSystem for DiskFileSystem {
         }
         let full_path = self.to_sys_path(&fs_path);
 
+        if !full_path.starts_with(self.inner.root_path()) {
+            return Ok(FileContent::NotFound.cell());
+        }
+
         self.inner.register_read_invalidator(&full_path).await?;
 
         let _lock = self.inner.lock_path(&full_path).await;
