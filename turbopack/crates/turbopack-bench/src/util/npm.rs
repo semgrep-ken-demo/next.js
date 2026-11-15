@@ -31,18 +31,34 @@ impl std::fmt::Display for NpmPackage<'_> {
 }
 
 pub fn install(install_dir: &Path, packages: &[NpmPackage<'_>]) -> Result<()> {
-    if !fs::metadata(install_dir.join("package.json"))
+    let install_dir = install_dir
+        .canonicalize()
+        .map_err(|e| anyhow::anyhow!("invalid install directory: {e}"))?;
+    anyhow::ensure!(
+        install_dir.is_dir(),
+        "install_dir is not a directory: {}",
+        install_dir.display()
+    );
+
+    let package_json_path = install_dir.join("package.json");
+    anyhow::ensure!(
+        package_json_path
+            .canonicalize()
+            .unwrap_or(package_json_path.clone())
+            .starts_with(&install_dir),
+        "package.json path escapes install directory"
+    );
+
+    if !fs::metadata(&package_json_path)
         .map(|metadata| metadata.is_file())
         .unwrap_or(false)
     {
-        // Create a simple package.json if one doesn't exist
-
         let package_json = json!({
             "private": true,
             "version": "0.0.0",
         });
 
-        File::create(install_dir.join("package.json"))?
+        File::create(&package_json_path)?
             .write_all(format!("{package_json:#}").as_bytes())?;
     }
 
@@ -63,7 +79,7 @@ pub fn install(install_dir: &Path, packages: &[NpmPackage<'_>]) -> Result<()> {
 
     let npm = command("npm")
         .args(args)
-        .current_dir(install_dir)
+        .current_dir(&install_dir)
         .output()?;
 
     if !npm.status.success() {
