@@ -141,5 +141,6 @@ function _eval({ code, url, map }: EcmascriptModuleEntry): ModuleFactory {
   }
 
   // eslint-disable-next-line no-eval
+  // nosemgrep: javascript.browser.security.eval-detected.eval-detected
   return eval(code)
 }
