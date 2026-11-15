@@ -119,6 +119,9 @@ impl Bundler {
 }
 
 pub fn generate(summary_path: PathBuf, filter_bundlers: Option<FxHashSet<&str>>) -> Result<()> {
+    let summary_path = summary_path
+        .canonicalize()
+        .context("Failed to canonicalize summary_path")?;
     let summary_file = File::open(&summary_path)?;
     let reader = BufReader::new(summary_file);
     let summary: BaseBenchmarks = serde_json::from_reader(reader)?;
@@ -260,7 +263,15 @@ fn generate_scaling(output_path: PathBuf, by_bench: &ByBench) -> Result<()> {
     fs::create_dir_all(&output_path)?;
 
     for theme in THEMES {
-        for (bench_name, by_bundler) in by_bench {
+        for (bench_name_raw, by_bundler) in by_bench {
+            let bench_name: String = bench_name_raw
+                .chars()
+                .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+                .collect();
+            anyhow::ensure!(
+                !bench_name.is_empty() && !bench_name.contains(".."),
+                "Invalid bench name: {bench_name_raw}"
+            );
             let module_counts: FxHashSet<_> = by_bundler
                 .values()
                 .flat_map(|by_module_count| by_module_count.keys())
