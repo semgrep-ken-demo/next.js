@@ -217,7 +217,7 @@ pub async fn run(args: FsWatcher) -> anyhow::Result<()> {
                         let relative_target = Path::new("..").join(&new_target_relative);
 
                         remove_symlink(&symlink_path, mode)?;
-                        create_symlink(&symlink_path, &relative_target, mode)?;
+                        create_symlink(&symlink_path, &relative_target, mode, &fs_root)?;
 
                         modified_file_paths.insert(symlink_path);
                         symlink_targets[symlink_idx] = new_target_relative;
@@ -563,14 +563,43 @@ fn create_initial_symlinks(
     let mut symlink_targets = Vec::new();
     for i in 0..symlink_count {
         let symlink_path = symlinks_dir.join(i.to_string());
-        create_symlink(&symlink_path, &relative_target, symlink_mode)?;
+        create_symlink(&symlink_path, &relative_target, symlink_mode, fs_root)?;
         symlink_targets.push(initial_target_relative.clone());
     }
 
     Ok(symlink_targets)
 }
 
-fn create_symlink(link_path: &Path, target: &Path, mode: SymlinkMode) -> anyhow::Result<()> {
+fn validate_symlink_target(link_path: &Path, target: &Path, allowed_root: &Path) -> anyhow::Result<()> {
+    let resolved = link_path.parent().unwrap_or(link_path).join(target);
+    let mut normalized = Vec::new();
+    for component in resolved.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                if normalized.pop().is_none() {
+                    anyhow::bail!(
+                        "symlink target escapes filesystem root: {}",
+                        target.display()
+                    );
+                }
+            }
+            std::path::Component::CurDir => {}
+            c => normalized.push(c),
+        }
+    }
+    let normalized_path: PathBuf = normalized.iter().collect();
+    if !normalized_path.starts_with(allowed_root) {
+        anyhow::bail!(
+            "symlink target resolves outside allowed root: {} -> {}",
+            target.display(),
+            normalized_path.display()
+        );
+    }
+    Ok(())
+}
+
+fn create_symlink(link_path: &Path, target: &Path, mode: SymlinkMode, fs_root: &Path) -> anyhow::Result<()> {
+    validate_symlink_target(link_path, target, fs_root)?;
     #[cfg(unix)]
     {
         let _ = mode;
