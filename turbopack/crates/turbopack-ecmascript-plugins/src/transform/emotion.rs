@@ -142,9 +142,12 @@ impl CustomTransformer for EmotionTransformer {
                 program.hash(&mut hasher);
                 hasher.finish()
             };
+            let sanitized_path = Path::new(ctx.file_name_str)
+                .file_name()
+                .map_or(Path::new(""), Path::new);
             program.mutate(swc_emotion::emotion(
                 &self.config,
-                Path::new(ctx.file_name_str),
+                sanitized_path,
                 hash as u32,
                 ctx.source_map.clone(),
                 ctx.comments.clone(),
