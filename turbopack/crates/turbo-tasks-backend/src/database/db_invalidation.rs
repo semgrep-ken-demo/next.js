@@ -157,7 +157,13 @@ pub(crate) fn cleanup_db(base_path: &Path) -> anyhow::Result<()> {
 }
 
 fn cleanup_db_inner(base_path: &Path) -> io::Result<()> {
-    let Ok(contents) = read_dir(base_path) else {
+    // Canonicalize to resolve any ".." segments or symlinks, preventing path traversal.
+    let base_path = match base_path.canonicalize() {
+        Ok(p) => p,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    let Ok(contents) = read_dir(&base_path) else {
         return Ok(());
     };
 
