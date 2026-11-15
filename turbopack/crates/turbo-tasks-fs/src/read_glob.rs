@@ -247,21 +247,36 @@ pub mod tests {
         target: Q,
         path: P,
     ) -> std::io::Result<()> {
-        assert!(target.as_ref().is_absolute());
+        let target = target.as_ref();
+        assert!(target.is_absolute());
+        // Canonicalize parent directories to prevent path traversal via ".." components.
+        // The target file itself may not exist (dead symlink tests), so resolve the parent only.
+        let target = target
+            .parent()
+            .expect("symlink target must have a parent directory")
+            .canonicalize()?
+            .join(target.file_name().expect("symlink target must have a file name"));
+        let path = path.as_ref();
+        let path = path
+            .parent()
+            .expect("symlink path must have a parent directory")
+            .canonicalize()?
+            .join(path.file_name().expect("symlink path must have a file name"));
+
         let _ = std::fs::remove_dir(&path);
         let _ = std::fs::remove_file(&path);
 
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(target, path)
+            std::os::unix::fs::symlink(&target, &path)
         }
         #[cfg(windows)]
         {
             let metadata = std::fs::metadata(&target).ok();
             if metadata.is_none_or(|m| m.is_file()) {
-                std::os::windows::fs::symlink_file(target, path)
+                std::os::windows::fs::symlink_file(&target, &path)
             } else {
-                std::os::windows::fs::junction_point(target, path)
+                std::os::windows::fs::junction_point(&target, &path)
             }
         }
     }
