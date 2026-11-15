@@ -219,7 +219,17 @@ impl StaticSortedFile {
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
         let path = db_path.join(&filename);
-        let file = File::open(&path)
+        let canonical_base = db_path
+            .canonicalize()
+            .with_context(|| format!("Failed to resolve database path {}", db_path.display()))?;
+        let canonical_path = path
+            .canonicalize()
+            .with_context(|| format!("Failed to resolve SST file path {}", path.display()))?;
+        ensure!(
+            canonical_path.starts_with(&canonical_base),
+            "SST file path escapes database directory"
+        );
+        let file = File::open(&canonical_path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
             format!(
@@ -781,7 +791,17 @@ impl StaticSortedFileIter {
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
         let path = db_path.join(&filename);
-        let file = File::open(&path)
+        let canonical_base = db_path
+            .canonicalize()
+            .with_context(|| format!("Failed to resolve database path {}", db_path.display()))?;
+        let canonical_path = path
+            .canonicalize()
+            .with_context(|| format!("Failed to resolve SST file path {}", path.display()))?;
+        ensure!(
+            canonical_path.starts_with(&canonical_base),
+            "SST file path escapes database directory"
+        );
+        let file = File::open(&canonical_path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
             format!(
