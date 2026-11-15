@@ -80,6 +80,12 @@ pub mod invalidation_reasons {
 /// In most cases, you should prefer a higher-level API like [`crate::BackingStorage::invalidate`]
 /// to this one.
 pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Result<()> {
+    let base_path = match base_path.canonicalize() {
+        Ok(p) => p,
+        // just ignore if the cache directory doesn't exist at all
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(err).context("Failed to resolve database path"),
+    };
     match File::create_new(base_path.join(INVALIDATION_MARKER)) {
         Ok(file) => {
             let mut writer = BufWriter::new(file);
@@ -115,6 +121,15 @@ pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Resu
 pub(crate) fn check_db_invalidation_and_cleanup(
     base_path: &Path,
 ) -> anyhow::Result<StartupCacheState> {
+    let base_path = match base_path.canonicalize() {
+        Ok(p) => p,
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(StartupCacheState::NoCache),
+        Err(err) => {
+            return Err(err).with_context(|| {
+                format!("Failed to resolve database path {base_path:?}")
+            })
+        }
+    };
     match File::open(base_path.join(INVALIDATION_MARKER)) {
         Ok(file) => {
             // Best-effort: Try to read the reason_code from the file, if the file format is
@@ -127,11 +142,11 @@ pub(crate) fn check_db_invalidation_and_cleanup(
 
             // if this cleanup fails, we might try to open an invalid database later, so it's best
             // to just propagate the error here.
-            cleanup_db(base_path)?;
+            cleanup_db(&base_path)?;
             Ok(StartupCacheState::Invalidated { reason_code })
         }
         Err(err) if err.kind() == ErrorKind::NotFound => {
-            if fs::exists(base_path)? {
+            if fs::exists(&base_path)? {
                 Ok(StartupCacheState::Cached)
             } else {
                 Ok(StartupCacheState::NoCache)
@@ -148,7 +163,12 @@ pub(crate) fn check_db_invalidation_and_cleanup(
 /// You should not run this if the database has not yet been invalidated, as this operation is not
 /// atomic and could result in a partially-deleted and corrupted database.
 pub(crate) fn cleanup_db(base_path: &Path) -> anyhow::Result<()> {
-    cleanup_db_inner(base_path).with_context(|| {
+    let base_path = match base_path.canonicalize() {
+        Ok(p) => p,
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(err).context("Failed to resolve database path"),
+    };
+    cleanup_db_inner(&base_path).with_context(|| {
         format!(
             "Unable to remove invalid database. If this issue persists you can work around by \
              deleting {base_path:?}."
