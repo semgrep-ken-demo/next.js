@@ -846,6 +846,9 @@ fn main() -> Result<()> {
         bail!("Not a directory: {}", db_path.display());
     }
 
+    let db_path = fs::canonicalize(&db_path)
+        .with_context(|| format!("Failed to resolve path: {}", db_path.display()))?;
+
     // Collect SST info grouped by family
     let family_sst_info = collect_sst_info(&db_path)?;
 
