@@ -71,6 +71,18 @@ const {
 
 const contextDir = process.cwd()
 
+function assertWithinDir(base: string, resolved: string): string {
+  const normalizedBase = pathResolve(base)
+  const normalizedResolved = pathResolve(resolved)
+  if (
+    normalizedResolved !== normalizedBase &&
+    !normalizedResolved.startsWith(normalizedBase + path.sep)
+  ) {
+    throw new Error('Path traversal detected: resolved path escapes base directory')
+  }
+  return normalizedResolved
+}
+
 const LogType = Object.freeze({
   error: 'error',
   warn: 'warn',
@@ -165,7 +177,7 @@ const transform = (
   sourceMap: boolean
 ) => {
   return new Promise((resolve, reject) => {
-    const resource = pathResolve(contextDir, name)
+    const resource = assertWithinDir(contextDir, pathResolve(contextDir, name))
     const resourceDir = dirname(resource)
 
     const loadersWithOptions = loaders.map((loader) =>
@@ -202,7 +214,7 @@ const transform = (
               ipc
                 .sendRequest({
                   type: 'trackFileRead',
-                  file: relative(contextDir, pathResolve(p)),
+                  file: relative(contextDir, assertWithinDir(contextDir, pathResolve(p))),
                 })
                 .then(
                   () => {
