@@ -42,6 +42,28 @@ import { trace, initializeTraceState, exportTraceState } from '../trace'
 import { traceId } from '../trace/shared'
 import { Bundler, parseBundlerArgs } from '../lib/bundler'
 
+function sanitizeUserPath(unsafePath: string): string {
+  if (unsafePath.indexOf('\0') !== -1) {
+    printAndExit(`Invalid path containing null bytes: ${unsafePath}`)
+  }
+  return path.normalize(unsafePath)
+}
+
+function safePathJoin(base: string, ...segments: string[]): string {
+  const sanitizedSegments = segments.map((s) => sanitizeUserPath(s))
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const joined = path.resolve(base, ...sanitizedSegments)
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const normalizedBase = path.resolve(base)
+  if (
+    joined !== normalizedBase &&
+    !joined.startsWith(normalizedBase + path.sep)
+  ) {
+    printAndExit(`Path traversal detected in: ${segments.join(', ')}`)
+  }
+  return joined
+}
+
 export type NextDevOptions = {
   disableSourceMaps: boolean
   // Commander is not putting `--inspect` through the arg parser
@@ -147,7 +169,7 @@ const handleSessionStop = async (signal: NodeJS.Signals | number | null) => {
         typeof import('../telemetry/storage').Telemetry
       >) ||
       new Telemetry({
-        distDir: path.join(dir, distDir || '.next'),
+        distDir: safePathJoin(dir, distDir || '.next'),
       })
 
     telemetry.record(
@@ -416,7 +438,7 @@ const nextDev = async (
           ...(options.experimentalCpuProf
             ? {
                 NEXT_CPU_PROF: '1',
-                NEXT_CPU_PROF_DIR: path.join(dir, '.next-profiles'),
+                NEXT_CPU_PROF_DIR: safePathJoin(dir, '.next-profiles'),
                 __NEXT_PRIVATE_CPU_PROFILE: 'dev-server',
               }
             : undefined),
@@ -494,9 +516,11 @@ const nextDev = async (
 
         if (key && cert) {
           certificate = {
-            key: path.resolve(key),
-            cert: path.resolve(cert),
-            rootCA: rootCA ? path.resolve(rootCA) : undefined,
+            key: path.resolve(sanitizeUserPath(key)),
+            cert: path.resolve(sanitizeUserPath(cert)),
+            rootCA: rootCA
+              ? path.resolve(sanitizeUserPath(rootCA))
+              : undefined,
           }
         } else {
           certificate = await createSelfSignedCertificate(host)
