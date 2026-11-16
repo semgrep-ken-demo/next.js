@@ -14,7 +14,8 @@ function getAltProxyForBindingsDEV(
 ) {
   if (process.env.NODE_ENV === 'development') {
     const altType = type === 'Turbopack' ? 'Webpack' : 'Turbopack'
-    const altPkg = pkg.replace(new RegExp(type, 'gi'), altType.toLowerCase())
+    const regex = type === 'Turbopack' ? /turbopack/gi : /webpack/gi
+    const altPkg = pkg.replace(regex, altType.toLowerCase())
 
     return new Proxy(
       {},
