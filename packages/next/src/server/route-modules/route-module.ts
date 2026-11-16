@@ -785,7 +785,7 @@ export abstract class RouteModule<
       parsedUrl
     )
     const rewriteParamKeys = Object.keys(rewriteParams)
-    Object.assign(parsedUrl.query, rewrittenParsedUrl.query)
+    parsedUrl.query = { ...parsedUrl.query, ...rewrittenParsedUrl.query }
 
     // after processing rewrites we want to remove locale
     // from parsedUrl pathname
@@ -902,7 +902,7 @@ export abstract class RouteModule<
           Object.keys(queryResult.params).length
       ) {
         paramsToInterpolate = queryResult.params
-        params = Object.assign(queryResult.params)
+        params = { ...queryResult.params }
       } else {
         paramsToInterpolate =
           paramsResult.hasValidParams && params
@@ -928,7 +928,7 @@ export abstract class RouteModule<
       // try pulling from query if valid
       if (!params) {
         if (queryResult.hasValidParams) {
-          params = Object.assign({}, queryResult.params)
+          params = { ...queryResult.params }
 
           // If we pulled from query remove it so it's
           // only in params
@@ -946,7 +946,7 @@ export abstract class RouteModule<
           // the literal slug matches here e.g. /blog/[slug]
           // actually being requested
           if (paramsMatch) {
-            params = Object.assign({}, paramsMatch)
+            params = { ...paramsMatch }
           }
         }
       }
