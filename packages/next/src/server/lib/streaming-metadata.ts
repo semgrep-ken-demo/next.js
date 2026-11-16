@@ -1,5 +1,6 @@
 import {
   getBotType,
+  HTML_LIMITED_BOT_UA_RE,
   HTML_LIMITED_BOT_UA_RE_STRING,
 } from '../../shared/lib/router/utils/is-bot'
 import type { BaseNextRequest } from '../base-http'
@@ -14,9 +15,19 @@ export function shouldServeStreamingMetadata(
   const pattern = htmlLimitedBots || HTML_LIMITED_BOT_UA_RE_STRING
   if (cachedPattern !== pattern) {
     cachedPattern = pattern
-    cachedRegex = new RegExp(pattern, 'i')
+    if (!htmlLimitedBots) {
+      cachedRegex = HTML_LIMITED_BOT_UA_RE
+    } else {
+      try {
+        // htmlLimitedBots is developer-controlled via next.config.js, not end-user input.
+        // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+        cachedRegex = new RegExp(htmlLimitedBots, 'i')
+      } catch {
+        cachedPattern = HTML_LIMITED_BOT_UA_RE_STRING
+        cachedRegex = HTML_LIMITED_BOT_UA_RE
+      }
+    }
   }
-  // Only block metadata for HTML-limited bots
   if (userAgent && cachedRegex!.test(userAgent)) {
     return false
   }
