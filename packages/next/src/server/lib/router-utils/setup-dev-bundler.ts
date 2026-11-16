@@ -181,6 +181,17 @@ export async function propagateServerField(
   await opts.renderServer?.instance?.propagateServerField(opts.dir, field, args)
 }
 
+function validateAndJoinDistDir(baseDir: string, distDirInput: string): string {
+  const normalized = path.normalize(distDirInput)
+  if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+    throw new Error(
+      `"distDir" must be a relative path within the project root. ` +
+        `Configured value "${distDirInput}" resolves outside "${baseDir}".`
+    )
+  }
+  return path.join(baseDir, normalized)
+}
+
 async function startWatcher(
   opts: SetupOpts & {
     isSrcDir: boolean
@@ -189,7 +200,7 @@ async function startWatcher(
   const { nextConfig, appDir, pagesDir, dir, resetFetch } = opts
   const { useFileSystemPublicRoutes } = nextConfig
 
-  const distDir = path.join(opts.dir, opts.nextConfig.distDir)
+  const distDir = validateAndJoinDistDir(opts.dir, opts.nextConfig.distDir)
 
   setGlobal('distDir', distDir)
   setGlobal('phase', PHASE_DEVELOPMENT_SERVER)
@@ -1192,6 +1203,7 @@ async function startWatcher(
           )
 
           // Generate cache-life types if cacheLife config exists
+          // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
           const cacheLifeFilePath = path.join(distTypesDir, 'cache-life.d.ts')
           writeCacheLifeTypes(opts.nextConfig.cacheLife, cacheLifeFilePath)
 
