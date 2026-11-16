@@ -7,5 +7,13 @@ export function getStorageDirectory(distDir: string): string | undefined {
   if (isLikelyEphemeral) {
     return undefined
   }
-  return path.join(distDir, 'cache')
+
+  const resolvedBase = path.resolve(distDir)
+  const cachePath = path.join(resolvedBase, 'cache')
+
+  if (!cachePath.startsWith(resolvedBase + path.sep)) {
+    return undefined
+  }
+
+  return cachePath
 }
