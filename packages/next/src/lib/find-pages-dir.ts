@@ -2,11 +2,15 @@ import fs from 'fs'
 import path from 'path'
 
 export function findDir(dir: string, name: 'pages' | 'app'): string | null {
+  const resolvedDir = path.resolve(dir)
+
   // prioritize ./${name} over ./src/${name}
-  let curDir = path.join(dir, name)
+  let curDir = path.resolve(resolvedDir, name)
+  if (!curDir.startsWith(resolvedDir + path.sep)) return null
   if (fs.existsSync(curDir)) return curDir
 
-  curDir = path.join(dir, 'src', name)
+  curDir = path.resolve(resolvedDir, 'src', name)
+  if (!curDir.startsWith(resolvedDir + path.sep)) return null
   if (fs.existsSync(curDir)) return curDir
 
   return null
