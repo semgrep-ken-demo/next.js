@@ -1,7 +1,7 @@
 import { fileExists } from '../../lib/file-exists'
 import { getPagePaths } from '../../shared/lib/page-path/get-page-paths'
 import { nonNullable } from '../../lib/non-nullable'
-import { join, sep, normalize } from 'path'
+import { join, sep, normalize, resolve } from 'path'
 import { promises as fsPromises } from 'fs'
 import { warn } from '../../build/output/log'
 import { cyan } from '../../lib/picocolors'
@@ -9,10 +9,28 @@ import { isMetadataRouteFile } from '../../lib/metadata/is-metadata-route'
 import { escapeStringRegexp } from '../../shared/lib/escape-regexp'
 import type { PageExtensions } from '../../build/page-extensions-type'
 
+/**
+ * Safely joins a base directory with path segments, returning null if the
+ * result would escape the base directory (path traversal).
+ */
+function safePath(base: string, relativePath: string): string | null {
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const resolved = resolve(base, relativePath)
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const normalizedBase = resolve(base)
+  if (resolved !== normalizedBase && !resolved.startsWith(normalizedBase + sep)) {
+    return null
+  }
+  return resolved
+}
+
 async function isTrueCasePagePath(pagePath: string, pagesDir: string) {
   const pageSegments = normalize(pagePath).split(sep).filter(Boolean)
+  if (pageSegments.includes('..')) return false
   const segmentExistsPromises = pageSegments.map(async (segment, i) => {
-    const segmentParentDir = join(pagesDir, ...pageSegments.slice(0, i))
+    const partialPath = pageSegments.slice(0, i).join(sep)
+    const segmentParentDir = safePath(pagesDir, partialPath)
+    if (!segmentParentDir) return false
     const parentDirEntries = await fsPromises.readdir(segmentParentDir)
     return parentDirEntries.includes(segment)
   })
@@ -39,7 +57,8 @@ export async function findPageFile(
   const [existingPath, ...others] = (
     await Promise.all(
       pagePaths.map(async (path) => {
-        const filePath = join(pagesDir, path)
+        const filePath = safePath(pagesDir, path)
+        if (!filePath) return null
         try {
           return (await fileExists(filePath)) ? path : null
         } catch (err: any) {
@@ -60,8 +79,8 @@ export async function findPageFile(
 
   if (others.length > 0) {
     warn(
-      `Duplicate page detected. ${cyan(join('pages', existingPath))} and ${cyan(
-        join('pages', others[0])
+      `Duplicate page detected. ${cyan('pages/' + existingPath)} and ${cyan(
+        'pages/' + others[0]
       )} both resolve to ${cyan(normalizedPagePath)}.`
     )
   }
