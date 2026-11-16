@@ -23,14 +23,14 @@ export function dset(obj, keys, val) {
     k
   while (i < l) {
     k = keys[i++]
-    if (k === '__proto__' || k === 'constructor' || k === 'prototype') break
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') return
     t = t[k] =
       i === l
         ? val
         : typeof (x = t[k]) === typeof keys
           ? x
           : keys[i] * 0 !== 0 || !!~('' + keys[i]).indexOf('.')
-            ? {}
+            ? Object.create(null)
             : []
   }
 }
