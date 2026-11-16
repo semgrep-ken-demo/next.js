@@ -9,6 +9,17 @@ import { getCacheDirectory } from './helpers/get-cache-directory'
 
 const MAX_VERSIONS_TO_CACHE = 8
 
+function safePath(base: string, ...segments: string[]): string {
+  const resolvedBase = path.resolve(base)
+  const resolved = path.resolve(resolvedBase, ...segments)
+  if (!resolved.startsWith(resolvedBase + path.sep) && resolved !== resolvedBase) {
+    throw new Error(
+      `Detected path traversal: joined path ${resolved} escapes base directory ${resolvedBase}`
+    )
+  }
+  return resolved
+}
+
 async function extractBinary(
   outputDirectory: string,
   pkgName: string,
@@ -21,15 +32,15 @@ async function extractBinary(
 
   const extractFromTar = () =>
     x({
-      file: path.join(cacheDirectory, tarFileName),
+      file: safePath(cacheDirectory, tarFileName),
       cwd: outputDirectory,
       strip: 1,
     })
 
-  if (!fs.existsSync(path.join(cacheDirectory, tarFileName))) {
+  if (!fs.existsSync(safePath(cacheDirectory, tarFileName))) {
     Log.info(`Downloading swc package ${pkgName}... to ${cacheDirectory}`)
     await fs.promises.mkdir(cacheDirectory, { recursive: true })
-    const tempFile = path.join(
+    const tempFile = safePath(
       cacheDirectory,
       `${tarFileName}.temp-${Date.now()}`
     )
@@ -82,7 +93,7 @@ async function extractBinary(
     })
 
     await fs.promises.access(tempFile) // ensure the temp file existed
-    await fs.promises.rename(tempFile, path.join(cacheDirectory, tarFileName))
+    await fs.promises.rename(tempFile, safePath(cacheDirectory, tarFileName))
   } else {
     Log.info(`Using cached swc package ${pkgName}...`)
   }
@@ -99,7 +110,7 @@ async function extractBinary(
     // prune oldest versions in cache
     for (let i = 0; i++; i < cacheFiles.length - MAX_VERSIONS_TO_CACHE) {
       await fs.promises
-        .unlink(path.join(cacheDirectory, cacheFiles[i]))
+        .unlink(safePath(cacheDirectory, cacheFiles[i]))
         .catch(() => {})
     }
   }
@@ -113,7 +124,7 @@ export async function downloadNativeNextSwc(
   for (const triple of triplesABI) {
     const pkgName = `@next/swc-${triple}`
     const tarFileName = `${pkgName.substring(6)}-${version}.tgz`
-    const outputDirectory = path.join(bindingsDirectory, pkgName)
+    const outputDirectory = safePath(bindingsDirectory, pkgName)
 
     if (fs.existsSync(outputDirectory)) {
       // if the package is already downloaded a different
@@ -133,7 +144,7 @@ export async function downloadWasmSwc(
 ) {
   const pkgName = `@next/swc-wasm-${variant}`
   const tarFileName = `${pkgName.substring(6)}-${version}.tgz`
-  const outputDirectory = path.join(wasmDirectory, pkgName)
+  const outputDirectory = safePath(wasmDirectory, pkgName)
 
   if (fs.existsSync(outputDirectory)) {
     // if the package is already downloaded a different
