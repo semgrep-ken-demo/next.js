@@ -16,6 +16,18 @@ import { promises } from 'fs'
 const isDev = process.env.NODE_ENV === 'development'
 const pagePathCache = !isDev ? new LRUCache<string | null>(1000) : null
 
+function safePathJoin(base: string, ...segments: string[]): string {
+  const resolvedBase = path.resolve(base)
+  const resolvedPath = path.resolve(base, ...segments)
+  if (
+    !resolvedPath.startsWith(resolvedBase + path.sep) &&
+    resolvedPath !== resolvedBase
+  ) {
+    throw new PageNotFoundError(segments.join(path.sep))
+  }
+  return resolvedPath
+}
+
 export function getMaybePagePath(
   page: string,
   distDir: string,
@@ -29,7 +41,7 @@ export function getMaybePagePath(
   // If we have a cached path, we can return it directly.
   if (pagePath) return pagePath
 
-  const serverBuildPath = path.join(
+  const serverBuildPath = safePathJoin(
     /* turbopackIgnore: true */ distDir,
     SERVER_DIRECTORY
   )
@@ -37,7 +49,7 @@ export function getMaybePagePath(
 
   if (isAppPath) {
     appPathsManifest = loadManifest(
-      path.join(
+      safePathJoin(
         /* turbopackIgnore: true */ serverBuildPath,
         APP_PATHS_MANIFEST
       ),
@@ -45,7 +57,7 @@ export function getMaybePagePath(
     ) as PagesManifest
   }
   const pagesManifest = loadManifest(
-    path.join(/* turbopackIgnore: true */ serverBuildPath, PAGES_MANIFEST),
+    safePathJoin(/* turbopackIgnore: true */ serverBuildPath, PAGES_MANIFEST),
     !isDev
   ) as PagesManifest
 
@@ -91,7 +103,7 @@ export function getMaybePagePath(
     return pagePath
   }
 
-  pagePath = path.join(/* turbopackIgnore: true */ serverBuildPath, pagePath)
+  pagePath = safePathJoin(/* turbopackIgnore: true */ serverBuildPath, pagePath)
 
   pagePathCache?.set(cacheKey, pagePath)
   return pagePath
