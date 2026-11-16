@@ -8,7 +8,7 @@ import { normalizeCatchAllRoutes } from '../../../build/normalize-catchall-route
 import { compareAppPaths } from '../../../shared/lib/router/utils/app-paths'
 
 export class DevAppPageRouteMatcherProvider extends FileCacheRouteMatcherProvider<AppPageRouteMatcher> {
-  private readonly expression: RegExp
+  private readonly extensions: ReadonlySet<string>
   private readonly normalizers: DevAppNormalizers
   private readonly isTurbopack: boolean
 
@@ -21,13 +21,21 @@ export class DevAppPageRouteMatcherProvider extends FileCacheRouteMatcherProvide
     super(appDir, reader)
 
     this.normalizers = new DevAppNormalizers(appDir, extensions, isTurbopack)
-
-    // Match any page file that ends with `/page.${extension}` or `/default.${extension}` under the app
-    // directory.
-    this.expression = new RegExp(
-      `[/\\\\](page|default)\\.(?:${extensions.join('|')})$`
-    )
+    this.extensions = new Set(extensions)
     this.isTurbopack = isTurbopack
+  }
+
+  private isPageFile(filename: string): boolean {
+    const sepIdx = Math.max(
+      filename.lastIndexOf('/'),
+      filename.lastIndexOf('\\')
+    )
+    const basename = sepIdx >= 0 ? filename.slice(sepIdx + 1) : filename
+    const dotIdx = basename.indexOf('.')
+    if (dotIdx < 0) return false
+    const name = basename.slice(0, dotIdx)
+    if (name !== 'page' && name !== 'default') return false
+    return this.extensions.has(basename.slice(dotIdx + 1))
   }
 
   protected async transform(
@@ -43,7 +51,7 @@ export class DevAppPageRouteMatcherProvider extends FileCacheRouteMatcherProvide
     let appPaths: Record<string, string[]> = {}
     for (const filename of files) {
       // If the file isn't a match for this matcher, then skip it.
-      if (!this.expression.test(filename)) continue
+      if (!this.isPageFile(filename)) continue
 
       let page = this.normalizers.page.normalize(filename)
 
