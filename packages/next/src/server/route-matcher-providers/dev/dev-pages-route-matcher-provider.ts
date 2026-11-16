@@ -8,6 +8,7 @@ import path from 'path'
 import type { LocaleRouteNormalizer } from '../../normalizers/locale-route-normalizer'
 import { FileCacheRouteMatcherProvider } from './file-cache-route-matcher-provider'
 import { DevPagesNormalizers } from '../../normalizers/built/pages'
+import { escapeStringRegexp } from '../../../shared/lib/escape-regexp'
 
 export class DevPagesRouteMatcherProvider extends FileCacheRouteMatcherProvider<PagesRouteMatcher> {
   private readonly expression: RegExp
@@ -23,7 +24,9 @@ export class DevPagesRouteMatcherProvider extends FileCacheRouteMatcherProvider<
 
     // Match any route file that ends with `/${filename}.${extension}` under the
     // pages directory.
-    this.expression = new RegExp(`\\.(?:${extensions.join('|')})$`)
+    this.expression = new RegExp(
+      `\\.(?:${extensions.map((ext) => escapeStringRegexp(ext)).join('|')})$`
+    )
 
     this.normalizers = new DevPagesNormalizers(pagesDir, extensions)
   }
