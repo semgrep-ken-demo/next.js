@@ -38,7 +38,12 @@ const nextTypegen = async (
 
   const nextConfig = await loadConfig(PHASE_PRODUCTION_BUILD, baseDir)
   await installBindings(nextConfig.experimental?.useWasmBinary)
-  const distDir = join(baseDir, nextConfig.distDir)
+  const distDir = path.resolve(baseDir, nextConfig.distDir)
+  if (!distDir.startsWith(baseDir + path.sep) && distDir !== baseDir) {
+    printAndExit(
+      `> Invalid distDir configured: "${nextConfig.distDir}" resolves outside the project root.`
+    )
+  }
   const { pagesDir, appDir } = findPagesDir(baseDir)
 
   const strictRouteTypes = Boolean(nextConfig.experimental.strictRouteTypes)
