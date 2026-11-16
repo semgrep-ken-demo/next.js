@@ -121,6 +121,13 @@ module.exports = function (task) {
 
       const filePath = path.join(file.dir, file.base)
       const fullFilePath = path.join(__dirname, filePath)
+
+      if (!fullFilePath.startsWith(__dirname + path.sep)) {
+        throw new Error(
+          `File path escapes project directory: ${filePath}`
+        )
+      }
+
       const distFilePath = path.dirname(
         // we must strip src from filePath as it isn't carried into
         // the dist file path
@@ -132,7 +139,7 @@ module.exports = function (task) {
       )
 
       const options = {
-        filename: path.join(file.dir, file.base),
+        filename: filePath,
         sourceMaps: true,
         inlineSourcesContent: true,
         sourceFileName: path.relative(distFilePath, fullFilePath),
