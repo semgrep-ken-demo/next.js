@@ -86,7 +86,7 @@ export async function recursiveReadDir(
             }
 
             // Handle each file.
-            const absolutePathname = path.join(directory, file.name)
+            const absolutePathname = path.join(directory, path.basename(file.name))
 
             // If enabled, ignore the file if it matches the ignore filter.
             if (ignoreFilter && ignoreFilter(absolutePathname)) {
