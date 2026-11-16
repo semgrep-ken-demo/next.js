@@ -418,7 +418,7 @@ export async function adapter(
     // headers.
     const isAllowedOrigin = !isRelative
       ? params.request.nextConfig?.experimental?.clientParamParsingOrigins?.some(
-          (origin) => new RegExp(origin).test(destination.origin)
+          (origin) => destination.origin.includes(origin)
         )
       : false
 
