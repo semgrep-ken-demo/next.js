@@ -32,7 +32,7 @@ import type { ErrorModule } from './load-default-error-components'
 import type { PagesModule } from './route-modules/pages/module.compiled'
 
 import fs from 'fs'
-import { join, relative } from 'path'
+import { join, normalize, relative } from 'path'
 import { getRouteMatcher } from '../shared/lib/router/utils/route-matcher'
 import { addRequestMeta, getRequestMeta, setRequestMeta } from './request-meta'
 import {
@@ -1519,14 +1519,23 @@ export default class NextNodeServer extends BaseServer<
       return null
     }
 
+    const safeJoin = (base: string, unsafePath: string): string => {
+      const normalizedBase = normalize(base)
+      const resolved = normalize(normalizedBase + '/' + unsafePath)
+      if (!resolved.startsWith(normalizedBase + '/') && resolved !== normalizedBase) {
+        throw new Error(`Path traversal detected: ${unsafePath}`)
+      }
+      return resolved
+    }
+
     return {
       name: pageInfo.name,
       paths: pageInfo.files.map((file) =>
-        join(/* turbopackIgnore: true */ this.distDir, file)
+        safeJoin(/* turbopackIgnore: true */ this.distDir, file)
       ),
       wasm: (pageInfo.wasm ?? []).map((binding) => ({
         ...binding,
-        filePath: join(
+        filePath: safeJoin(
           /* turbopackIgnore: true */ this.distDir,
           binding.filePath
         ),
@@ -1536,7 +1545,7 @@ export default class NextNodeServer extends BaseServer<
         pageInfo.assets.map((binding) => {
           return {
             ...binding,
-            filePath: join(
+            filePath: safeJoin(
               /* turbopackIgnore: true */ this.distDir,
               binding.filePath
             ),
