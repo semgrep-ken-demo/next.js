@@ -57,6 +57,23 @@ import type { MemoryEvictionMode } from '../build/swc/types'
 export { normalizeConfig } from './config-shared'
 export type { DomainLocale, NextConfig } from './config-shared'
 
+const PROTO_POLLUTION_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+function safeGet(obj: Record<string, any>, key: string): any {
+  if (PROTO_POLLUTION_KEYS.has(key)) return undefined
+  if (!Object.hasOwn(obj, key)) return undefined
+  return obj[key]
+}
+
+function safeSet(
+  obj: Record<string, any>,
+  key: string,
+  value: any
+): void {
+  if (PROTO_POLLUTION_KEYS.has(key)) return
+  obj[key] = value
+}
+
 function normalizeNextConfigZodErrors(
   error: ZodError<NextConfig>
 ): [warnings: string[], fatalErrors: string[]] {
@@ -117,12 +134,13 @@ export function warnOptionHasBeenDeprecated(
 ): boolean {
   let hasWarned = false
   if (!silent) {
-    let current = config
+    let current: any = config
     let found = true
     const nestedPropertyKeys = nestedPropertyKey.split('.')
     for (const key of nestedPropertyKeys) {
-      if ((current as any)[key] !== undefined) {
-        current = (current as any)[key]
+      const value = safeGet(current, key)
+      if (value !== undefined) {
+        current = value
       } else {
         found = false
         break
@@ -243,16 +261,26 @@ export function warnOptionHasBeenMovedOutOfExperimental(
       )
     }
 
-    let current = config
+    let current: any = config
     const newKeys = newKey.split('.')
+    let aborted = false
     while (newKeys.length > 1) {
       const key = newKeys.shift()!
-      ;(current as any)[key] = (current as any)[key] || {}
-      current = (current as any)[key]
+      if (PROTO_POLLUTION_KEYS.has(key)) {
+        aborted = true
+        break
+      }
+      if (safeGet(current, key) === undefined) {
+        safeSet(current, key, {})
+      }
+      current = safeGet(current, key)
     }
-    ;(current as any)[newKeys.shift()!] = (config.experimental as any)[
-      oldExperimentalKey
-    ]
+    if (!aborted) {
+      const finalKey = newKeys.shift()!
+      safeSet(current, finalKey, (config.experimental as any)[
+        oldExperimentalKey
+      ])
+    }
   }
 
   return config
@@ -267,14 +295,15 @@ function warnCustomizedOption(
   silent: boolean
 ) {
   const segs = key.split('.')
-  let current = config
+  let current: any = config
 
   while (segs.length >= 1) {
     const seg = segs.shift()!
-    if (!(seg in current)) {
+    const value = safeGet(current, seg)
+    if (value === undefined) {
       return
     }
-    current = (current as any)[seg]
+    current = value
   }
 
   if (!silent && current !== defaultValue) {
