@@ -146,12 +146,11 @@ module.exports = function (task) {
 
       // Replace `.ts|.tsx` with `.js` in files with an extension
       if (ext) {
-        const extRegex = new RegExp(ext.replace('.', '\\.') + '$', 'i')
+        const baseWithoutExt = file.base.slice(0, -ext.length)
         // Remove the extension if stripExtension is enabled or replace it with `.js`
-        file.base = file.base.replace(
-          extRegex,
-          stripExtension ? '' : `.${ext === '.mts' ? 'm' : ''}js`
-        )
+        file.base = stripExtension
+          ? baseWithoutExt
+          : baseWithoutExt + `.${ext === '.mts' ? 'm' : ''}js`
       }
 
       if (output.map) {
