@@ -35,14 +35,36 @@ function getSafeParamName(paramName: string) {
 }
 
 function escapeSegment(str: string, segmentName: string) {
-  return str.replace(
-    new RegExp(`:${escapeStringRegexp(segmentName)}`, 'g'),
-    `__ESC_COLON_${segmentName}`
-  )
+  return str.replaceAll(`:${segmentName}`, `__ESC_COLON_${segmentName}`)
 }
 
 function unescapeSegments(str: string) {
   return str.replace(/__ESC_COLON_/gi, ':')
+}
+
+function replaceNotFollowedByWord(
+  str: string,
+  search: string,
+  replacement: string
+): string {
+  let result = ''
+  let i = 0
+  while (i < str.length) {
+    const idx = str.indexOf(search, i)
+    if (idx === -1) {
+      result += str.slice(i)
+      break
+    }
+    result += str.slice(i, idx)
+    const afterIdx = idx + search.length
+    if (afterIdx >= str.length || !/\w/.test(str[afterIdx])) {
+      result += replacement
+    } else {
+      result += search
+    }
+    i = afterIdx
+  }
+  return result
 }
 
 export function matchHas(
@@ -93,6 +115,7 @@ export function matchHas(
       params[getSafeParamName(key!)] = value
       return true
     } else if (value) {
+      // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- hasItem.value is a developer-supplied regex pattern from next.config.js route rules, not user input
       const matcher = new RegExp(`^${hasItem.value}$`)
       const matches = Array.isArray(value)
         ? value.slice(-1)[0].match(matcher)
@@ -132,19 +155,14 @@ export function compileNonPath(value: string, params: Params): string {
   for (const key of Object.keys(params)) {
     if (value.includes(`:${key}`)) {
       value = value
-        .replace(
-          new RegExp(`:${key}\\*`, 'g'),
-          `:${key}--ESCAPED_PARAM_ASTERISKS`
-        )
-        .replace(
-          new RegExp(`:${key}\\?`, 'g'),
-          `:${key}--ESCAPED_PARAM_QUESTION`
-        )
-        .replace(new RegExp(`:${key}\\+`, 'g'), `:${key}--ESCAPED_PARAM_PLUS`)
-        .replace(
-          new RegExp(`:${key}(?!\\w)`, 'g'),
-          `--ESCAPED_PARAM_COLON${key}`
-        )
+        .replaceAll(`:${key}*`, `:${key}--ESCAPED_PARAM_ASTERISKS`)
+        .replaceAll(`:${key}?`, `:${key}--ESCAPED_PARAM_QUESTION`)
+        .replaceAll(`:${key}+`, `:${key}--ESCAPED_PARAM_PLUS`)
+      value = replaceNotFollowedByWord(
+        value,
+        `:${key}`,
+        `--ESCAPED_PARAM_COLON${key}`
+      )
     }
   }
   value = value
