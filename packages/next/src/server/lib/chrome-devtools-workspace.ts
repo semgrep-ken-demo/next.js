@@ -48,7 +48,10 @@ async function getChromeDevtoolsWorkspace(
   configDistDir: string
 ): Promise<ChromeDevtoolsWorkspace> {
   if (workspaceUUID === null) {
-    const distDir = path.join(root, configDistDir)
+    const distDir = path.resolve(root, configDistDir)
+    if (!distDir.startsWith(path.resolve(root) + path.sep)) {
+      throw new Error('distDir must be inside the project root')
+    }
     const cacheBaseDir = getStorageDirectory(distDir)
 
     if (cacheBaseDir === undefined) {
@@ -58,6 +61,9 @@ async function getChromeDevtoolsWorkspace(
         cacheBaseDir,
         'chrome-devtools-workspace-uuid'
       )
+      if (!cachedUUIDPath.startsWith(path.resolve(cacheBaseDir) + path.sep)) {
+        throw new Error('cachedUUIDPath must be inside the cache directory')
+      }
       try {
         workspaceUUID = await fs.promises.readFile(cachedUUIDPath, 'utf8')
       } catch {
