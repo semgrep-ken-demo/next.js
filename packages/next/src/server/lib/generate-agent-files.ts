@@ -43,10 +43,11 @@ export interface AgentFilesResult {
  * managed agent-rules marker.
  */
 export function hasAgentRulesInstalled(dir: string): boolean {
-  const agentsContent = tryReadFile(path.join(dir, 'AGENTS.md'))
+  const safeDir = sanitizeBaseDir(dir)
+  const agentsContent = tryReadFile(path.join(safeDir, 'AGENTS.md'))
   if (agentsContent?.includes(AGENT_RULES_START_MARKER)) return true
 
-  const claudeContent = tryReadFile(path.join(dir, 'CLAUDE.md'))
+  const claudeContent = tryReadFile(path.join(safeDir, 'CLAUDE.md'))
   if (claudeContent?.includes(AGENT_RULES_START_MARKER)) return true
 
   return false
@@ -65,8 +66,9 @@ export function hasAgentRulesInstalled(dir: string): boolean {
  * reported as `unchanged`.
  */
 export function writeAgentFiles(projectDir: string): AgentFilesResult {
-  const agentsMdPath = path.join(projectDir, 'AGENTS.md')
-  const claudeMdPath = path.join(projectDir, 'CLAUDE.md')
+  const safeDir = sanitizeBaseDir(projectDir)
+  const agentsMdPath = path.join(safeDir, 'AGENTS.md')
+  const claudeMdPath = path.join(safeDir, 'CLAUDE.md')
   const block = buildAgentRulesBlock()
 
   const agentsMdExists = fs.existsSync(agentsMdPath)
@@ -95,6 +97,13 @@ export function writeAgentFiles(projectDir: string): AgentFilesResult {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+function sanitizeBaseDir(dir: string): string {
+  if (dir.includes('..')) {
+    throw new Error(`Path traversal detected in directory: "${dir}"`)
+  }
+  return dir
+}
 
 function tryReadFile(filePath: string): string | null {
   try {
