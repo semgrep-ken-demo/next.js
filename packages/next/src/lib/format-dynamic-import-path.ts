@@ -23,12 +23,27 @@ export function resolveCacheHandlerPathToFilesystem(filePath: string): string {
  * @param dir File directory
  * @param filePath Absolute or relative path, or file:// URL (e.g. from import.meta.resolve)
  */
+export function validateRelativePath(userPath: string): string {
+  const normalized = path.normalize(userPath)
+  if (path.isAbsolute(normalized) || normalized.startsWith('..')) {
+    throw new Error(
+      `Path "${userPath}" must be relative and cannot traverse above its base directory`
+    )
+  }
+  return normalized
+}
+
 export const formatDynamicImportPath = (dir: string, filePath: string) => {
   const resolvedFilePath = resolveCacheHandlerPathToFilesystem(filePath)
 
-  const absoluteFilePath = path.isAbsolute(resolvedFilePath)
-    ? resolvedFilePath
-    : path.join(dir, resolvedFilePath)
+  let absoluteFilePath: string
+  if (path.isAbsolute(resolvedFilePath)) {
+    absoluteFilePath = resolvedFilePath
+  } else {
+    const safePath = validateRelativePath(resolvedFilePath)
+    absoluteFilePath = path.normalize(dir + path.sep + safePath)
+  }
+
   const formattedFilePath = pathToFileURL(absoluteFilePath).toString()
 
   return formattedFilePath
