@@ -1369,10 +1369,10 @@ describe('generateInterceptionRoutesRewrites', () => {
 
       const sourceParams = rewrite.source
         .match(/:(\w+)\*?/g)
-        ?.map((p) => p.slice(1).replace('*', ''))
+        ?.map((p) => p.slice(1).replace(/\*/g, ''))
       const destParams = rewrite.destination
         .match(/:(\w+)\*?/g)
-        ?.map((p) => p.slice(1).replace('*', ''))
+        ?.map((p) => p.slice(1).replace(/\*/g, ''))
       const regexParams = Array.from(
         rewrite.regex!.matchAll(/\(\?<(\w+)>/g)
       ).map((m) => m[1])
@@ -1409,10 +1409,10 @@ describe('generateInterceptionRoutesRewrites', () => {
       // Extract parameter names, removing * suffix from catchall
       const sourceParams = rewrite.source
         .match(/:(\w+)\*?/g)
-        ?.map((p) => p.slice(1).replace('*', ''))
+        ?.map((p) => p.slice(1).replace(/\*/g, ''))
       const destParams = rewrite.destination
         .match(/:(\w+)\*?/g)
-        ?.map((p) => p.slice(1).replace('*', ''))
+        ?.map((p) => p.slice(1).replace(/\*/g, ''))
       const regexParams = Array.from(
         rewrite.regex!.matchAll(/\(\?<(\w+)>/g)
       ).map((m) => m[1])
