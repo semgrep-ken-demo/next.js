@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from 'fs'
 import { resolveFrom } from './resolve-from'
-import { dirname, join, relative } from 'path'
+import { dirname, isAbsolute, join, normalize, relative } from 'path'
 
 export interface MissingDependency {
   file: string
@@ -29,6 +29,14 @@ export type NecessaryDependencies = {
   missing: MissingDependency[]
 }
 
+function safeJoin(base: string, ...segments: string[]): string {
+  const resolved = normalize(join(base, ...segments))
+  if (!resolved.startsWith(base + '/') && resolved !== base) {
+    throw new Error('Path traversal detected')
+  }
+  return resolved
+}
+
 export function hasNecessaryDependencies(
   baseDir: string,
   requiredPackages: MissingDependency[]
@@ -43,12 +51,17 @@ export function hasNecessaryDependencies(
       )
       const pkgDir = dirname(pkgPath)
 
-      resolutions.set(join(p.pkg, 'package.json'), pkgPath)
+      const pkgKey = safeJoin(p.pkg, 'package.json')
+      resolutions.set(pkgKey, pkgPath)
 
       if (p.exportsRestrict) {
         const fileNameToVerify = relative(p.pkg, p.file)
         if (fileNameToVerify) {
-          const fileToVerify = join(pkgDir, fileNameToVerify)
+          if (isAbsolute(fileNameToVerify) || fileNameToVerify.startsWith('..')) {
+            missingPackages.push(p)
+            continue
+          }
+          const fileToVerify = safeJoin(pkgDir, fileNameToVerify)
           if (existsSync(fileToVerify)) {
             resolutions.set(p.pkg, fileToVerify)
           } else {
