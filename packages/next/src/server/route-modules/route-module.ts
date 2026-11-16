@@ -100,6 +100,18 @@ const dynamicImportEsmDefault = (id: string) =>
     (mod) => mod.default || mod
   )
 
+const NESTED_QUANTIFIER_RE = /([+*}])\s*\)\s*[+*?{]/
+
+function safeRegExpFromManifest(pattern: string): RegExp {
+  if (NESTED_QUANTIFIER_RE.test(pattern)) {
+    throw new Error(
+      `Potentially unsafe regex pattern in routes manifest: ${pattern.slice(0, 100)}`
+    )
+  }
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+  return new RegExp(pattern)
+}
+
 /**
  * RouteModule is the base class for all route modules. This class should be
  * extended by all route modules.
@@ -272,7 +284,7 @@ export abstract class RouteModule<
         prefetchHintsManifest: undefined,
         interceptionRoutePatterns: (
           maybeJSONParse(self.__INTERCEPTION_ROUTE_REWRITE_MANIFEST) ?? []
-        ).map((rewrite: any) => new RegExp(rewrite.regex)),
+        ).map((rewrite: any) => safeRegExpFromManifest(rewrite.regex)),
       }
     } else {
       if (!projectDir) {
@@ -423,7 +435,7 @@ export abstract class RouteModule<
         prefetchHintsManifest,
         interceptionRoutePatterns: routesManifest.rewrites.beforeFiles
           .filter(isInterceptionRouteRewrite)
-          .map((rewrite) => new RegExp(rewrite.regex)),
+          .map((rewrite) => safeRegExpFromManifest(rewrite.regex)),
       }
     }
 
