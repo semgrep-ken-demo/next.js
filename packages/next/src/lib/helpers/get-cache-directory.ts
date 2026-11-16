@@ -38,7 +38,10 @@ export function getCacheDirectory(fileDirectory: string, envPath?: string) {
         process.exit(0)
       }
     }
-    result = path.join(systemCacheDirectory, fileDirectory)
+    const sanitizedDir = path
+      .normalize(fileDirectory)
+      .replace(/^(\.\.(\/|\\|$))+/, '')
+    result = path.join(systemCacheDirectory, sanitizedDir)
   }
 
   if (!path.isAbsolute(result)) {
@@ -47,7 +50,13 @@ export function getCacheDirectory(fileDirectory: string, envPath?: string) {
     //   - so that registry directory matches between installation and execution.
     // INIT_CWD points to the root of `npm/yarn install` and is probably what
     // the user meant when typing the relative path.
-    result = path.resolve(process.env['INIT_CWD'] || process.cwd(), result)
+    const sanitizedResult = path
+      .normalize(result)
+      .replace(/^(\.\.(\/|\\|$))+/, '')
+    result = path.resolve(
+      process.env['INIT_CWD'] || process.cwd(),
+      sanitizedResult
+    )
   }
   return result
 }
