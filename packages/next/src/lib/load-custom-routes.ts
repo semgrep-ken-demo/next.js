@@ -369,7 +369,7 @@ export function checkCustomRoutes(
 
         for (const token of sourceTokens) {
           if (typeof token === 'object' && typeof token.name === 'number') {
-            const unnamedIndex = new RegExp(`:${token.name}(?!\\d)`)
+            const unnamedIndex = new RegExp(`:${escapeStringRegexp(String(token.name))}(?!\\d)`)
             if ((route as Rewrite).destination.match(unnamedIndex)) {
               unnamedInDest.add(`:${token.name}`)
             }
