@@ -14,7 +14,7 @@ import { EventEmitter } from 'events'
 import { findPageFile } from '../lib/find-page-file'
 import { runDependingOnPageType, isDeferredEntry } from '../../build/entries'
 import { getStaticInfoIncludingLayouts } from '../../build/get-static-info-including-layouts'
-import { join, posix } from 'path'
+import { posix, resolve, sep } from 'path'
 import { normalizePathSep } from '../../shared/lib/page-path/normalize-path-sep'
 import { normalizePagePath } from '../../shared/lib/page-path/normalize-page-path'
 import { ensureLeadingSlash } from '../../shared/lib/page-path/ensure-leading-slash'
@@ -50,6 +50,18 @@ import { handleErrorStateResponse } from '../mcp/tools/get-errors'
 import { handlePageMetadataResponse } from '../mcp/tools/get-page-metadata'
 
 const debug = createDebug('next:on-demand-entry-handler')
+
+function safeJoin(baseDir: string, subPath: string): string {
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+  const resolved = resolve(baseDir, subPath)
+  const normalizedBase = baseDir.endsWith(sep) ? baseDir : baseDir + sep
+  if (!resolved.startsWith(normalizedBase) && resolved !== baseDir) {
+    throw new Error(
+      `Resolved path "${resolved}" escapes base directory "${baseDir}"`
+    )
+  }
+  return resolved
+}
 
 /**
  * Returns object keys with type inferred from the object key
@@ -436,7 +448,7 @@ export async function findPagePathData(
     }
 
     return {
-      filename: join(rootDir, pagePath),
+      filename: safeJoin(rootDir, pagePath),
       bundlePath: bundlePath.slice(1),
       page: pageKey,
     }
@@ -456,7 +468,7 @@ export async function findPagePathData(
         )
         if (globalNotFoundPath) {
           return {
-            filename: join(appDir, globalNotFoundPath),
+            filename: safeJoin(appDir, globalNotFoundPath),
             bundlePath: `app${UNDERSCORE_NOT_FOUND_ROUTE_ENTRY}`,
             page: UNDERSCORE_NOT_FOUND_ROUTE_ENTRY,
           }
@@ -471,7 +483,7 @@ export async function findPagePathData(
         )
         if (notFoundPath) {
           return {
-            filename: join(appDir, notFoundPath),
+            filename: safeJoin(appDir, notFoundPath),
             bundlePath: `app${UNDERSCORE_NOT_FOUND_ROUTE_ENTRY}`,
             page: UNDERSCORE_NOT_FOUND_ROUTE_ENTRY,
           }
@@ -497,7 +509,7 @@ export async function findPagePathData(
       )
 
       return {
-        filename: join(appDir, pagePath),
+        filename: safeJoin(appDir, pagePath),
         bundlePath: posix.join('app', pageUrl),
         page: posix.normalize(pageUrl),
       }
@@ -521,7 +533,7 @@ export async function findPagePathData(
     )
 
     return {
-      filename: join(pagesDir, pagePath),
+      filename: safeJoin(pagesDir, pagePath),
       bundlePath: posix.join('pages', normalizePagePath(pageUrl)),
       page: posix.normalize(pageUrl),
     }
