@@ -1,4 +1,4 @@
-import { join } from 'path'
+import { join, basename } from 'path'
 import fs from 'fs/promises'
 import type { Dirent, StatsBase } from 'fs'
 
@@ -10,7 +10,7 @@ export async function getFilesInDir(path: string): Promise<Set<string>> {
     let resolvedFile: Dirent | StatsBase<number> = file
 
     if (file.isSymbolicLink()) {
-      resolvedFile = await fs.stat(join(path, file.name))
+      resolvedFile = await fs.stat(join(path, basename(file.name)))
     }
 
     if (resolvedFile.isFile()) {
