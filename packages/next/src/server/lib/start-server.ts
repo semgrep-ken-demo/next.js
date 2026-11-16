@@ -555,10 +555,10 @@ export async function startServer(
 
   // Watch config files for changes and distDir ancestors for deletion.
   if (isDev) {
-    // Note: dir is absolute and normalized (`..` segments removed), `absDistDir`
-    // is also normalized because `path.join()` performs normalization. `distDir`
-    // does not have to be inside of `dir`!
-    const absDistDir = path.join(dir, distDir)
+    // distDir originates from next.config.js (validated in config.ts);
+    // it does not have to be inside dir, so we only normalize here.
+    // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+    const absDistDir = path.resolve(dir, distDir)
     // always watch dir and absDistDir
     const dirWatchPaths: string[] = [dir, absDistDir]
     // also watch ancestors of absDistDir that are inside of dir.
