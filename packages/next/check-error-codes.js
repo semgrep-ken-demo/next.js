@@ -33,9 +33,12 @@ async function main() {
       : 1
 
   // Process new error files
-  const errorFiles = [...(await fs.readdir(errorsDir))].map((file) =>
-    path.join(errorsDir, file)
-  )
+  const errorFiles = [...(await fs.readdir(errorsDir))]
+    .map((file) => path.join(errorsDir, file))
+    .filter((filePath) => {
+      const resolved = path.resolve(filePath)
+      return resolved.startsWith(path.resolve(errorsDir) + path.sep)
+    })
 
   let newErrorCount = 0
   for (const file of errorFiles) {
