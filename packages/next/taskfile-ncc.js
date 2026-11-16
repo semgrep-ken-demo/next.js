@@ -1,7 +1,7 @@
 const findUp = require('find-up')
 const ncc = require('@vercel/ncc')
 const { existsSync, readFileSync } = require('fs')
-const { basename, dirname, extname, join, resolve } = require('path')
+const { basename, dirname, extname, join, resolve, sep } = require('path')
 const { Module } = require('module')
 
 // files might be lower case and not able to be found on case-sensitive
@@ -22,6 +22,16 @@ const bundleRequire = m.require
 bundleRequire.resolve = (request, options) =>
   Module._resolveFilename(request, m, false, options)
 
+function safeJoin(base, ...segments) {
+  const resolved = resolve(base, ...segments)
+  if (!resolved.startsWith(resolve(base) + sep) && resolved !== resolve(base)) {
+    throw new Error(
+      `Path traversal detected: ${segments.join('/')} escapes ${base}`
+    )
+  }
+  return resolved
+}
+
 module.exports = function (task) {
   // eslint-disable-next-line require-yield
   task.plugin('ncc', {}, function* (file, options) {
@@ -32,7 +42,7 @@ module.exports = function (task) {
     let precompiled = options.precompiled !== false
     delete options.precompiled
 
-    return ncc(join(__dirname, file.dir, file.base), {
+    return ncc(safeJoin(__dirname, file.dir, file.base), {
       filename: file.base,
       minify: options.minify === false ? false : true,
       assetBuilds: true,
@@ -45,7 +55,7 @@ module.exports = function (task) {
         this._.files.push({
           data,
           base: basename(key),
-          dir: join(file.dir, dirname(key)),
+          dir: safeJoin(file.dir, dirname(key)),
         })
       })
 
@@ -88,13 +98,13 @@ function writePackageManifest(
   }
   let { name, author, license } = require(packagePath)
 
-  const compiledPackagePath = join(
+  const compiledPackagePath = safeJoin(
     __dirname,
     `${!precompiled ? 'dist/' : ''}src/compiled/${bundleName || packageName}`
   )
 
   for (const licenseFile of potentialLicenseFiles) {
-    const potentialLicensePath = join(dirname(packagePath), licenseFile)
+    const potentialLicensePath = safeJoin(dirname(packagePath), licenseFile)
     if (existsSync(potentialLicensePath)) {
       this._.files.push({
         dir: compiledPackagePath,
