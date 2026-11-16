@@ -15,7 +15,7 @@ import path from 'path'
 import http from 'http'
 import https from 'https'
 import os from 'os'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import * as Log from '../../build/output/log'
 import setupDebug from 'next/dist/compiled/debug'
 import { RESTART_EXIT_CODE } from './utils'
@@ -54,17 +54,24 @@ async function getProcessIdUsingPort(port: number): Promise<string | null> {
   const timeoutMs = 250
   const processLookupController = new AbortController()
 
+  const sanitizedPort = Number.parseInt(String(port), 10)
+  if (!Number.isFinite(sanitizedPort) || sanitizedPort < 0 || sanitizedPort > 65535) {
+    debug('Invalid port number', port)
+    return null
+  }
+
   const pidPromise = new Promise<string | null>((resolve) => {
     const handleError = (error: Error) => {
-      debug('Failed to get process ID for port', port, error)
+      debug('Failed to get process ID for port', sanitizedPort, error)
       resolve(null)
     }
 
     try {
       // Use lsof on Unix-like systems (macOS, Linux)
       if (process.platform !== 'win32') {
-        exec(
-          `lsof -ti:${port} -sTCP:LISTEN`,
+        execFile(
+          'lsof',
+          [`-ti:${sanitizedPort}`, '-sTCP:LISTEN'],
           { signal: processLookupController.signal },
           (error, stdout) => {
             if (error) {
@@ -78,8 +85,9 @@ async function getProcessIdUsingPort(port: number): Promise<string | null> {
         )
       } else {
         // Use netstat on Windows
-        exec(
-          `netstat -ano | findstr /C:":${port} " | findstr LISTENING`,
+        execFile(
+          'cmd.exe',
+          ['/c', `netstat -ano | findstr /C:":${sanitizedPort} " | findstr LISTENING`],
           { signal: processLookupController.signal },
           (error, stdout) => {
             if (error) {
@@ -113,7 +121,7 @@ async function getProcessIdUsingPort(port: number): Promise<string | null> {
 
   const timeoutId = setTimeout(() => {
     processLookupController.abort(
-      `PID detection timed out after ${timeoutMs}ms for port ${port}.`
+      `PID detection timed out after ${timeoutMs}ms for port ${sanitizedPort}.`
     )
   }, timeoutMs)
 
