@@ -210,7 +210,12 @@ async function exportAppImpl(
       })
     ))
 
-  const distDir = join(dir, nextConfig.distDir)
+  const distDir = resolve(dir, nextConfig.distDir)
+  if (!distDir.startsWith(dir + sep)) {
+    throw new ExportError(
+      `Invalid distDir: "${nextConfig.distDir}" resolves outside the project directory.`
+    )
+  }
   const telemetry = options.buildExport ? null : new Telemetry({ distDir })
 
   if (telemetry) {
