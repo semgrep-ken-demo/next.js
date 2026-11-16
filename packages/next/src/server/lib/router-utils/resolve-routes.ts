@@ -865,7 +865,7 @@ export function getResolveRoutes(
           const parsedDestinationOrigin = parsedDestination.origin
           const isAllowedOrigin = parsedDestinationOrigin
             ? config.experimental.clientParamParsingOrigins?.some((origin) =>
-                new RegExp(origin).test(parsedDestinationOrigin)
+                parsedDestinationOrigin.includes(origin)
               )
             : false
 
