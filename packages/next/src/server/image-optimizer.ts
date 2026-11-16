@@ -59,6 +59,19 @@ const BYPASS_TYPES = [SVG, ICO, ICNS, BMP, JXL, HEIC]
 const BLUR_IMG_SIZE = 8 // should match `next-image-loader`
 const BLUR_QUALITY = 70 // should match `next-image-loader`
 
+function validatePathSegment(segment: string): string {
+  if (
+    segment.includes('/') ||
+    segment.includes('\\') ||
+    segment.includes('\0') ||
+    segment === '..' ||
+    segment === '.'
+  ) {
+    throw new Error('Invariant: invalid path segment')
+  }
+  return segment
+}
+
 let _sharp: typeof import('sharp')
 
 async function initCacheEntries(
@@ -177,11 +190,16 @@ async function writeToCacheDir(
   etag: string,
   upstreamEtag: string
 ) {
-  const dir = join(/* turbopackIgnore: true */ cacheDir, cacheKey)
+  const dir = join(
+    /* turbopackIgnore: true */ cacheDir,
+    validatePathSegment(cacheKey)
+  )
   const filename = join(
     /* turbopackIgnore: true */
     dir,
-    `${maxAge}.${expireAt}.${etag}.${upstreamEtag}.${extension}`
+    validatePathSegment(
+      `${maxAge}.${expireAt}.${etag}.${upstreamEtag}.${extension}`
+    )
   )
 
   await promises.rm(dir, { recursive: true, force: true }).catch(() => {})
@@ -191,7 +209,10 @@ async function writeToCacheDir(
 }
 
 async function readFromCacheDir(cacheDir: string, cacheKey: string) {
-  const dir = join(/* turbopackIgnore: true */ cacheDir, cacheKey)
+  const dir = join(
+    /* turbopackIgnore: true */ cacheDir,
+    validatePathSegment(cacheKey)
+  )
   const files = await promises.readdir(dir)
   const file = files[0]
   if (!file) {
@@ -203,7 +224,10 @@ async function readFromCacheDir(cacheDir: string, cacheKey: string) {
     '.',
     5
   )
-  const filePath = join(/* turbopackIgnore: true */ dir, file)
+  const filePath = join(
+    /* turbopackIgnore: true */ dir,
+    validatePathSegment(file)
+  )
   const buffer = await promises.readFile(/* turbopackIgnore: true */ filePath)
   const expireAt = Number(expireAtSt)
   const maxAge = Number(maxAgeSt)
@@ -212,10 +236,16 @@ async function readFromCacheDir(cacheDir: string, cacheKey: string) {
 
 async function deleteFromCacheDir(cacheDir: string, cacheKey: string) {
   return promises
-    .rm(join(/* turbopackIgnore: true */ cacheDir, cacheKey), {
-      recursive: true,
-      force: true,
-    })
+    .rm(
+      join(
+        /* turbopackIgnore: true */ cacheDir,
+        validatePathSegment(cacheKey)
+      ),
+      {
+        recursive: true,
+        force: true,
+      }
+    )
     .catch((err) => {
       Log.error(`Failed to delete cache key ${cacheKey}`, err)
     })
