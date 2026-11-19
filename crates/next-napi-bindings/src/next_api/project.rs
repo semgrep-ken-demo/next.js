@@ -462,11 +462,22 @@ pub fn project_new(
                     .join(path)
             }
         } else {
-            PathBuf::from(&options.root_path)
+            let root = PathBuf::from(&options.root_path);
+            let candidate = root
                 .join(&options.project_path)
                 .join(DIST_PROFILES_DIR_NAME)
                 // use a generic binary extension to hint to random tools not to read it.
-                .join("trace-turbopack.bin")
+                .join("trace-turbopack.bin");
+            let canonical_root = std::fs::canonicalize(&root).unwrap_or_else(|_| root.clone());
+            let canonical_parent = candidate
+                .parent()
+                .and_then(|p| std::fs::canonicalize(p).ok())
+                .unwrap_or_else(|| canonical_root.clone());
+            assert!(
+                canonical_parent.starts_with(&canonical_root),
+                "Trace file path escapes the project root"
+            );
+            candidate
         };
         let trace_dir = trace_file
             .parent()
