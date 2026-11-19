@@ -93,6 +93,24 @@ use crate::{
     util::DhatProfilerGuard,
 };
 
+/// Normalizes a path by resolving `.` and `..` components without touching the
+/// filesystem. Used to validate that constructed paths stay within an expected
+/// root directory before any I/O takes place.
+fn normalize_path_no_io(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::CurDir => {}
+            other => normalized.push(other),
+        }
+    }
+    normalized
+}
+
 /// Used by [`benchmark_file_io`]. This is a noisy benchmark, so set the
 /// threshold high.
 const SLOW_FILESYSTEM_THRESHOLD: Duration = Duration::from_millis(200);
@@ -462,11 +480,21 @@ pub fn project_new(
                     .join(path)
             }
         } else {
-            PathBuf::from(&options.root_path)
+            let root = PathBuf::from(&options.root_path);
+            let candidate = root
                 .join(&options.project_path)
                 .join(DIST_PROFILES_DIR_NAME)
                 // use a generic binary extension to hint to random tools not to read it.
-                .join("trace-turbopack.bin")
+                .join("trace-turbopack.bin");
+            let normalized = normalize_path_no_io(&candidate);
+            let normalized_root = normalize_path_no_io(&root);
+            assert!(
+                normalized.starts_with(&normalized_root),
+                "Trace file path {} escapes project root {}",
+                candidate.display(),
+                root.display(),
+            );
+            candidate
         };
         let trace_dir = trace_file
             .parent()
