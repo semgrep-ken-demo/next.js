@@ -217,7 +217,7 @@ pub async fn run(args: FsWatcher) -> anyhow::Result<()> {
                         let relative_target = Path::new("..").join(&new_target_relative);
 
                         remove_symlink(&symlink_path, mode)?;
-                        create_symlink(&symlink_path, &relative_target, mode)?;
+                        create_symlink(&fs_root, &symlink_path, &relative_target, mode)?;
 
                         modified_file_paths.insert(symlink_path);
                         symlink_targets[symlink_idx] = new_target_relative;
@@ -563,14 +563,46 @@ fn create_initial_symlinks(
     let mut symlink_targets = Vec::new();
     for i in 0..symlink_count {
         let symlink_path = symlinks_dir.join(i.to_string());
-        create_symlink(&symlink_path, &relative_target, symlink_mode)?;
+        create_symlink(fs_root, &symlink_path, &relative_target, symlink_mode)?;
         symlink_targets.push(initial_target_relative.clone());
     }
 
     Ok(symlink_targets)
 }
 
-fn create_symlink(link_path: &Path, target: &Path, mode: SymlinkMode) -> anyhow::Result<()> {
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut components = Vec::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                components.pop();
+            }
+            std::path::Component::CurDir => {}
+            c => components.push(c),
+        }
+    }
+    components.iter().collect()
+}
+
+fn create_symlink(
+    fs_root: &Path,
+    link_path: &Path,
+    target: &Path,
+    mode: SymlinkMode,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        link_path.starts_with(fs_root),
+        "symlink path escapes root: {}",
+        link_path.display()
+    );
+    let effective = link_path.parent().unwrap_or(link_path).join(target);
+    let normalized = normalize_path(&effective);
+    anyhow::ensure!(
+        normalized.starts_with(fs_root),
+        "symlink target escapes root: {}",
+        normalized.display()
+    );
+
     #[cfg(unix)]
     {
         let _ = mode;
