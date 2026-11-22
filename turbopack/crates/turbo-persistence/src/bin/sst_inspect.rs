@@ -424,8 +424,18 @@ fn iter_key_block_entry_types(
 fn analyze_sst_file(db_path: &Path, info: &SstInfo) -> Result<SstStats> {
     let filename = format!("{:08}.sst", info.sequence_number);
     let path = db_path.join(&filename);
+    let canonical_path = path
+        .canonicalize()
+        .with_context(|| format!("Failed to resolve {}", filename))?;
+    let canonical_db = db_path
+        .canonicalize()
+        .context("Failed to resolve db directory")?;
+    if !canonical_path.starts_with(&canonical_db) {
+        bail!("SST file {} resolves outside database directory", filename);
+    }
 
-    let file = File::open(&path).with_context(|| format!("Failed to open {}", filename))?;
+    let file =
+        File::open(&canonical_path).with_context(|| format!("Failed to open {}", filename))?;
     let file_size = file.metadata()?.len();
     let mmap = unsafe { Mmap::map(&file)? };
     advise_mmap_for_persistence(&mmap)?;
