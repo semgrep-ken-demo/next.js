@@ -80,6 +80,9 @@ pub mod invalidation_reasons {
 /// In most cases, you should prefer a higher-level API like [`crate::BackingStorage::invalidate`]
 /// to this one.
 pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Result<()> {
+    let base_path = base_path
+        .canonicalize()
+        .with_context(|| format!("Failed to canonicalize {base_path:?}"))?;
     match File::create_new(base_path.join(INVALIDATION_MARKER)) {
         Ok(file) => {
             let mut writer = BufWriter::new(file);
@@ -115,7 +118,15 @@ pub(crate) fn invalidate_db(base_path: &Path, reason_code: &str) -> anyhow::Resu
 pub(crate) fn check_db_invalidation_and_cleanup(
     base_path: &Path,
 ) -> anyhow::Result<StartupCacheState> {
-    match File::open(base_path.join(INVALIDATION_MARKER)) {
+    if !fs::exists(base_path)? {
+        return Ok(StartupCacheState::NoCache);
+    }
+    // Resolve symlinks and ".." components to prevent path traversal.
+    let base_path = base_path
+        .canonicalize()
+        .with_context(|| format!("Failed to canonicalize {base_path:?}"))?;
+    let marker_path = base_path.join(INVALIDATION_MARKER);
+    match File::open(&marker_path) {
         Ok(file) => {
             // Best-effort: Try to read the reason_code from the file, if the file format is
             // corrupted (or anything else) just use `None`.
@@ -127,16 +138,10 @@ pub(crate) fn check_db_invalidation_and_cleanup(
 
             // if this cleanup fails, we might try to open an invalid database later, so it's best
             // to just propagate the error here.
-            cleanup_db(base_path)?;
+            cleanup_db(&base_path)?;
             Ok(StartupCacheState::Invalidated { reason_code })
         }
-        Err(err) if err.kind() == ErrorKind::NotFound => {
-            if fs::exists(base_path)? {
-                Ok(StartupCacheState::Cached)
-            } else {
-                Ok(StartupCacheState::NoCache)
-            }
-        }
+        Err(err) if err.kind() == ErrorKind::NotFound => Ok(StartupCacheState::Cached),
         Err(err) => Err(err)
             .with_context(|| format!("Failed to check for {INVALIDATION_MARKER} in {base_path:?}")),
     }
