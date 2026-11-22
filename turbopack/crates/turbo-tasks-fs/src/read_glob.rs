@@ -253,7 +253,8 @@ pub mod tests {
 
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(target, path)
+            // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
+        std::os::unix::fs::symlink(target, path)
         }
         #[cfg(windows)]
         {
