@@ -63,7 +63,7 @@ export function evaluateBundle(result: ImportModuleResult): any {
     if (request.startsWith('/')) {
       resolved = request
     } else if (request.startsWith('./') || request.startsWith('../')) {
-      resolved = path.resolve(path.dirname(fromPath), request)
+      resolved = path.normalize(path.dirname(fromPath) + '/' + request)
     } else {
       // Intercept 'fs' to return the patched version when binary
       // assets are present (needed for WASM loading)
