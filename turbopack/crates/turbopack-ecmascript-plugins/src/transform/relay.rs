@@ -64,11 +64,22 @@ impl CustomTransformer for RelayTransformer {
     async fn transform(&self, program: &mut Program, ctx: &TransformContext<'_>) -> Result<()> {
         // If user supplied artifact_directory, it should be resolvable already.
         // Otherwise, supply default relative path (./__generated__)
-        let path_to_proj = PathBuf::from(
-            ctx.file_path
-                .parent()
-                .get_relative_path_to(&self.project_path)
-                .context("Expected relative path to relay artifact")?,
+        let relative_path_str = ctx
+            .file_path
+            .parent()
+            .get_relative_path_to(&self.project_path)
+            .context("Expected relative path to relay artifact")?;
+
+        anyhow::ensure!(
+            !relative_path_str.contains('\0'),
+            "Relay artifact path contains null byte"
+        );
+
+        let path_to_proj = PathBuf::from(&relative_path_str);
+
+        anyhow::ensure!(
+            path_to_proj.is_relative(),
+            "Relay artifact path must be relative"
         );
 
         program.mutate(swc_relay::relay(
