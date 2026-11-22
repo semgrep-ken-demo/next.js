@@ -209,7 +209,7 @@ function networkIdle(
       const currentCount = requests.get(request.url())
       if (currentCount === undefined) {
         console.error(
-          `Unexpected untracked but completed request ${request.url()}`
+          `Unexpected untracked but completed request ${request.url().replace(/[\r\n]+/g, '')}`
         )
         return
       }
