@@ -141,5 +141,5 @@ function _eval({ code, url, map }: EcmascriptModuleEntry): ModuleFactory {
   }
 
   // eslint-disable-next-line no-eval
-  return eval(code)
+  return (0, eval)(code)
 }
