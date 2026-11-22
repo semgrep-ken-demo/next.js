@@ -720,6 +720,10 @@ impl FileSystem for DiskFileSystem {
         }
         let full_path = self.to_sys_path(&fs_path);
 
+        if !full_path.normalize_lexically().is_ok_and(|p| p.starts_with(self.inner.root_path())) {
+            return Ok(FileContent::NotFound.cell());
+        }
+
         self.inner.register_read_invalidator(&full_path).await?;
 
         let _lock = self.inner.lock_path(&full_path).await;
@@ -745,6 +749,10 @@ impl FileSystem for DiskFileSystem {
             return Ok(RawDirectoryContent::not_found());
         }
         let full_path = self.to_sys_path(&fs_path);
+
+        if !full_path.normalize_lexically().is_ok_and(|p| p.starts_with(self.inner.root_path())) {
+            return Ok(RawDirectoryContent::not_found());
+        }
 
         self.inner.register_dir_invalidator(&full_path).await?;
 
@@ -833,6 +841,10 @@ impl FileSystem for DiskFileSystem {
             return Ok(LinkContent::NotFound.cell());
         }
         let full_path = self.to_sys_path(&fs_path);
+
+        if !full_path.normalize_lexically().is_ok_and(|p| p.starts_with(self.inner.root_path())) {
+            return Ok(LinkContent::NotFound.cell());
+        }
 
         self.inner.register_read_invalidator(&full_path).await?;
 
@@ -932,6 +944,10 @@ impl FileSystem for DiskFileSystem {
             turbobail!("Cannot write to denied path: {fs_path}");
         }
         let full_path = this.to_sys_path(&fs_path);
+
+        if !full_path.normalize_lexically().is_ok_and(|p| p.starts_with(this.inner.root_path())) {
+            turbobail!("Cannot write to path outside filesystem root: {fs_path}");
+        }
 
         // Persist the file content so it is stored in the persistent cache.
         // Since FileContent uses serialization = "hash", persisting it here ensures the full
@@ -1163,6 +1179,10 @@ impl FileSystem for DiskFileSystem {
             turbobail!("Cannot write link to denied path: {fs_path}");
         }
         let full_path = this.to_sys_path(&fs_path);
+
+        if !full_path.normalize_lexically().is_ok_and(|p| p.starts_with(this.inner.root_path())) {
+            turbobail!("Cannot write link to path outside filesystem root: {fs_path}");
+        }
 
         let content_hash = u128::from_le_bytes(hash_xxh3_hash128(&*target.await?));
 
@@ -1475,6 +1495,10 @@ impl FileSystem for DiskFileSystem {
         // Check if path is denied - if so, return an error (metadata shouldn't be readable)
         if self.inner.is_path_denied(&fs_path) {
             turbobail!("Cannot read metadata from denied path: {fs_path}");
+        }
+
+        if !full_path.normalize_lexically().is_ok_and(|p| p.starts_with(self.inner.root_path())) {
+            turbobail!("Cannot read metadata from path outside filesystem root: {fs_path}");
         }
 
         self.inner.register_read_invalidator(&full_path).await?;
