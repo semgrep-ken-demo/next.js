@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Component, Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -58,6 +61,13 @@ impl RelayTransformer {
     }
 }
 
+fn sanitize_file_path(raw: &str) -> PathBuf {
+    Path::new(raw)
+        .components()
+        .filter(|c| matches!(c, Component::Normal(_)))
+        .collect()
+}
+
 #[async_trait]
 impl CustomTransformer for RelayTransformer {
     #[tracing::instrument(level = tracing::Level::TRACE, name = "relay", skip_all)]
@@ -73,7 +83,7 @@ impl CustomTransformer for RelayTransformer {
 
         program.mutate(swc_relay::relay(
             self.config.clone(),
-            FileName::Real(PathBuf::from(ctx.file_name_str)),
+            FileName::Real(sanitize_file_path(ctx.file_name_str)),
             path_to_proj,
             // [TODO]: pages_dir comes through next-swc-loader
             // https://github.com/vercel/next.js/blob/ea472e8058faea8ebdab2ef6d3aab257a1f0d11c/packages/next/src/build/webpack-config.ts#L792
