@@ -119,6 +119,9 @@ impl Bundler {
 }
 
 pub fn generate(summary_path: PathBuf, filter_bundlers: Option<FxHashSet<&str>>) -> Result<()> {
+    let summary_path = summary_path
+        .canonicalize()
+        .context("Failed to canonicalize summary path")?;
     let summary_file = File::open(&summary_path)?;
     let reader = BufReader::new(summary_file);
     let summary: BaseBenchmarks = serde_json::from_reader(reader)?;
