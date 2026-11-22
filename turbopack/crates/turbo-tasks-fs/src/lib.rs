@@ -867,6 +867,15 @@ impl FileSystem for DiskFileSystem {
             }
         }
 
+        // For absolute symlink targets, normalize to resolve ".." or "." segments
+        // that could bypass the root prefix check below.
+        if is_link_absolute {
+            match file.normalize_lexically() {
+                Ok(normalized) => file = normalized,
+                Err(_) => return Ok(LinkContent::Invalid.cell()),
+            }
+        }
+
         // strip the root from the path, it serves two purpose
         // 1. ensure the linked path is under the root
         // 2. strip the root path if the linked path is absolute
