@@ -20,6 +20,9 @@ use url::Url;
 use crate::{BINDING_NAME, bundlers::Bundler, util::PageGuard};
 
 async fn copy_dir(from: PathBuf, to: PathBuf) -> anyhow::Result<()> {
+    let from = tokio::fs::canonicalize(from)
+        .await
+        .context("Failed to canonicalize source path")?;
     copy_dir_inner(from, to, Arc::new(Semaphore::new(64))).await
 }
 
