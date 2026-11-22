@@ -60,10 +60,17 @@ export const toPath = (file: string) => {
   return sep !== '/' ? relPath.replaceAll(sep, '/') : relPath
 }
 export const fromPath = (path: string) => {
-  return join(
+  const result = join(
     /* turbopackIgnore: true */ contextDir,
     sep !== '/' ? path.replaceAll('/', sep) : path
   )
+  const relPath = relative(contextDir, result)
+  if (isAbsolute(relPath) || relPath.startsWith('..')) {
+    throw new Error(
+      `Cannot depend on path (${path}) outside of root directory (${contextDir})`
+    )
+  }
+  return result
 }
 
 // Patch process.env to track which env vars are read
