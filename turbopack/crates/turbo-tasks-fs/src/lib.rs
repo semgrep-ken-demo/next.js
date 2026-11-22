@@ -746,6 +746,12 @@ impl FileSystem for DiskFileSystem {
         }
         let full_path = self.to_sys_path(&fs_path);
 
+        // Defense-in-depth: verify the resolved path is within the filesystem root
+        // to prevent path traversal even if the FileSystemPath normalization is bypassed.
+        if !full_path.starts_with(self.inner.root_path()) {
+            return Ok(RawDirectoryContent::not_found());
+        }
+
         self.inner.register_dir_invalidator(&full_path).await?;
 
         // we use the sync std function here as it's a lot faster (600%) in node-file-trace
