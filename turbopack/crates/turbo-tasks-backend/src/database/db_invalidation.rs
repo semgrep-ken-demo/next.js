@@ -157,7 +157,13 @@ pub(crate) fn cleanup_db(base_path: &Path) -> anyhow::Result<()> {
 }
 
 fn cleanup_db_inner(base_path: &Path) -> io::Result<()> {
-    let Ok(contents) = read_dir(base_path) else {
+    let canonical_base = match base_path.canonicalize() {
+        Ok(p) => p,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+
+    let Ok(contents) = read_dir(&canonical_base) else {
         return Ok(());
     };
 
@@ -165,15 +171,19 @@ fn cleanup_db_inner(base_path: &Path) -> io::Result<()> {
     for entry in contents {
         let entry = entry?;
         if entry.file_name() != INVALIDATION_MARKER {
+            let entry_path = entry.path();
+            if !entry_path.starts_with(&canonical_base) {
+                continue;
+            }
             if entry.file_type()?.is_dir() {
-                fs::remove_dir_all(entry.path())?;
+                fs::remove_dir_all(&entry_path)?;
             } else {
-                fs::remove_file(entry.path())?;
+                fs::remove_file(&entry_path)?;
             }
         }
     }
 
     // delete the invalidation marker last, once we're sure everything is cleaned up
-    fs::remove_file(base_path.join(INVALIDATION_MARKER))?;
+    fs::remove_file(canonical_base.join(INVALIDATION_MARKER))?;
     Ok(())
 }
