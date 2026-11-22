@@ -2,7 +2,7 @@ use std::{
     cmp::Ordering,
     fs::File,
     hash::BuildHasherDefault,
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
     sync::{
         Arc,
@@ -218,7 +218,7 @@ impl StaticSortedFile {
     /// It's lazy read on demand.
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
-        let path = db_path.join(&filename);
+        let path = sanitized_sst_path(db_path, &filename)?;
         let file = File::open(&path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
@@ -780,7 +780,7 @@ impl StaticSortedFileIter {
     /// eliminating all atomic refcounting during iteration.
     pub fn open(db_path: &Path, meta: StaticSortedFileMetaData) -> Result<Self> {
         let filename = format!("{:08}.sst", meta.sequence_number);
-        let path = db_path.join(&filename);
+        let path = sanitized_sst_path(db_path, &filename)?;
         let file = File::open(&path)
             .with_context(|| format!("Failed to open SST file {}", path.display()))?;
         let mmap = unsafe { Mmap::map(&file) }.with_context(|| {
@@ -1025,6 +1025,17 @@ fn entry_val_size(ty: u8) -> Result<usize> {
         }
         _ => bail!("Invalid key block entry type: {ty}"),
     }
+}
+
+/// Joins `db_path` with `filename`, validating that the filename contains no
+/// path separators or traversal components (e.g. `..`).
+fn sanitized_sst_path(db_path: &Path, filename: &str) -> Result<PathBuf> {
+    let name = Path::new(filename);
+    ensure!(
+        name.file_name() == Some(name.as_os_str()),
+        "SST filename must be a plain filename without path separators: {filename}"
+    );
+    Ok(db_path.join(name))
 }
 
 /// Reads the type and start offset from an offset table entry.
