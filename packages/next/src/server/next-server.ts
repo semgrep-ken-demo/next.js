@@ -482,11 +482,24 @@ export default class NextNodeServer extends BaseServer<
     if (!this.enabledDirectories.app) return []
 
     const routesManifest = this.getRoutesManifest()
-    return (
-      routesManifest?.rewrites.beforeFiles
-        .filter(isInterceptionRouteRewrite)
-        .map((rewrite) => new RegExp(rewrite.regex)) ?? []
+    const patterns: RegExp[] = []
+    const rewrites = routesManifest?.rewrites.beforeFiles.filter(
+      isInterceptionRouteRewrite
     )
+    if (rewrites) {
+      for (const rewrite of rewrites) {
+        try {
+          // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+          // rewrite.regex comes from the build-generated routes manifest, not user input
+          patterns.push(new RegExp(rewrite.regex))
+        } catch {
+          Log.warn(
+            `Invalid interception route regex in routes manifest: ${rewrite.regex}`
+          )
+        }
+      }
+    }
+    return patterns
   }
 
   protected async hasPage(pathname: string): Promise<boolean> {
