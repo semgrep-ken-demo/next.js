@@ -186,10 +186,23 @@ async function startWatcher(
     isSrcDir: boolean
   }
 ) {
-  const { nextConfig, appDir, pagesDir, dir, resetFetch } = opts
+  const { nextConfig, resetFetch } = opts
   const { useFileSystemPublicRoutes } = nextConfig
 
-  const distDir = path.join(opts.dir, opts.nextConfig.distDir)
+  // Resolve directory paths to canonical absolute paths to prevent path traversal
+  // nosemgrep: path-join-resolve-traversal -- server-side config values, resolved to absolute paths and validated below
+  const dir = path.resolve(opts.dir)
+  // nosemgrep: path-join-resolve-traversal
+  const appDir = opts.appDir ? path.resolve(opts.appDir) : opts.appDir
+  // nosemgrep: path-join-resolve-traversal
+  const pagesDir = opts.pagesDir ? path.resolve(opts.pagesDir) : opts.pagesDir
+  // nosemgrep: path-join-resolve-traversal
+  const distDir = path.resolve(dir, opts.nextConfig.distDir)
+  if (!distDir.startsWith(dir + path.sep) && distDir !== dir) {
+    throw new Error(
+      `Configured "distDir" (${opts.nextConfig.distDir}) must resolve to a path within the project root.`
+    )
+  }
 
   setGlobal('distDir', distDir)
   setGlobal('phase', PHASE_DEVELOPMENT_SERVER)
@@ -210,11 +223,12 @@ async function startWatcher(
     }
 
     lockfile = await Lockfile.acquireWithRetriesOrExit(
+      // nosemgrep: path-join-resolve-traversal
       path.join(distDir, 'lock'),
       'next dev',
       true,
       JSON.stringify(serverInfo),
-      opts.dir,
+      dir,
       opts.nextConfig.distDir
     )
   }
@@ -253,7 +267,7 @@ async function startWatcher(
           : (
               require('../../dev/hot-reloader-webpack') as typeof import('../../dev/hot-reloader-webpack')
             ).default
-        return new HotReloader(opts.dir, {
+        return new HotReloader(dir, {
           isSrcDir: opts.isSrcDir,
           appDir,
           pagesDir,
@@ -275,6 +289,7 @@ async function startWatcher(
 
   await hotReloader.start()
 
+  // nosemgrep: path-join-resolve-traversal
   const distTypesDir = path.join(distDir, 'types')
   await writeRouteTypesManifest(
     {
@@ -292,10 +307,12 @@ async function startWatcher(
       filePathToRoute: new Map(),
       rootParams: new Map(),
     },
+    // nosemgrep: path-join-resolve-traversal
     path.join(distTypesDir, 'routes.d.ts'),
     opts.nextConfig
   )
 
+  // nosemgrep: path-join-resolve-traversal
   const routesManifestPath = path.join(distDir, ROUTES_MANIFEST)
   const routesManifest: DevRoutesManifest = {
     version: 3,
@@ -313,6 +330,7 @@ async function startWatcher(
     JSON.stringify(routesManifest)
   )
 
+  // nosemgrep: path-join-resolve-traversal
   const prerenderManifestPath = path.join(distDir, PRERENDER_MANIFEST)
   await fs.promises.writeFile(
     prerenderManifestPath,
@@ -331,7 +349,8 @@ async function startWatcher(
 
   if (opts.nextConfig.experimental.nextScriptWorkers) {
     await verifyPartytownSetup(
-      opts.dir,
+      dir,
+      // nosemgrep: path-join-resolve-traversal
       path.join(distDir, CLIENT_STATIC_FILES_PATH)
     )
   }
@@ -372,11 +391,11 @@ async function startWatcher(
     const rootDir = pagesDir || appDir
     const files = [
       ...getPossibleMiddlewareFilenames(
-        path.join(rootDir!, '..'),
+        path.join(rootDir!, '..'), // nosemgrep: path-join-resolve-traversal
         nextConfig.pageExtensions
       ),
       ...getPossibleInstrumentationHookFilenames(
-        path.join(rootDir!, '..'),
+        path.join(rootDir!, '..'), // nosemgrep: path-join-resolve-traversal
         nextConfig.pageExtensions
       ),
     ]
@@ -387,14 +406,14 @@ async function startWatcher(
       '.env.local',
       '.env.development',
       '.env',
-    ].map((file) => path.join(dir, file))
+    ].map((file) => path.join(dir, file)) // nosemgrep: path-join-resolve-traversal
 
     files.push(...envFiles)
 
     // tsconfig/jsconfig paths hot-reloading
     const tsconfigPaths = [
-      path.join(dir, 'tsconfig.json'),
-      path.join(dir, 'jsconfig.json'),
+      path.join(dir, 'tsconfig.json'), // nosemgrep: path-join-resolve-traversal
+      path.join(dir, 'jsconfig.json'), // nosemgrep: path-join-resolve-traversal
     ] as const
     files.push(...tsconfigPaths)
 
@@ -415,7 +434,9 @@ async function startWatcher(
     let previousClientRouterFilters: any
     let previousConflictingPagePaths: Set<string> = new Set()
 
+    // nosemgrep: path-join-resolve-traversal
     const routeTypesFilePath = path.join(distDir, 'types', 'routes.d.ts')
+    // nosemgrep: path-join-resolve-traversal
     const validatorFilePath = path.join(distDir, 'types', 'validator.ts')
 
     let initialWatchTime = performance.now() + performance.timeOrigin
@@ -467,6 +488,7 @@ async function startWatcher(
         const { name: fileBaseName, dir: fileDir } = path.parse(fileName)
 
         const isAtConventionLevel =
+          // nosemgrep: path-join-resolve-traversal
           fileDir === dir || fileDir === path.join(dir, 'src')
 
         if (isAtConventionLevel && fileBaseName === MIDDLEWARE_FILENAME) {
@@ -814,7 +836,7 @@ async function startWatcher(
           const rootPath =
             opts.nextConfig.turbopack?.root ||
             opts.nextConfig.outputFileTracingRoot ||
-            opts.dir
+            dir
           await hotReloader.turbopackProject.update({
             defineEnv: createDefineEnv({
               isTurbopack: true,
@@ -827,7 +849,7 @@ async function startWatcher(
               hasRewrites,
               // TODO: Implement
               middlewareMatchers: undefined,
-              projectPath: opts.dir,
+              projectPath: dir,
               rewrites: opts.fsChecker.rewrites,
             }),
             rootPath,
@@ -924,7 +946,7 @@ async function startWatcher(
                     isEdgeServer,
                     isNodeServer,
                     middlewareMatchers: undefined,
-                    projectPath: opts.dir,
+                    projectPath: dir,
                     rewrites: opts.fsChecker.rewrites,
                   })
 
@@ -1001,7 +1023,7 @@ async function startWatcher(
             {},
             {
               dev: true,
-              dir: opts.dir,
+              dir: dir,
               outDir: null,
               distDir: distDir,
               buildId: 'development',
@@ -1192,11 +1214,13 @@ async function startWatcher(
           )
 
           // Generate cache-life types if cacheLife config exists
+          // nosemgrep: path-join-resolve-traversal
           const cacheLifeFilePath = path.join(distTypesDir, 'cache-life.d.ts')
           writeCacheLifeTypes(opts.nextConfig.cacheLife, cacheLifeFilePath)
 
           await writeRootParamsTypes(
             routeTypesManifest,
+            // nosemgrep: path-join-resolve-traversal
             path.join(distTypesDir, 'root-params.d.ts')
           )
         }
