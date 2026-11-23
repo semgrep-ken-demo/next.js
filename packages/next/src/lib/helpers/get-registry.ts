@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import { getPkgManager } from './get-pkg-manager'
 import { getFormattedNodeOptionsWithoutInspect } from '../../server/lib/utils'
 
@@ -14,19 +14,19 @@ export function getRegistry(baseDir: string = process.cwd()) {
   // Safe for non-workspace projects as it's equivalent to default `--workspaces=false`.
   // x-ref: https://github.com/vercel/next.js/issues/47121#issuecomment-1499044345
   // x-ref: https://github.com/npm/statusboard/issues/371#issue-920669998
-  const resolvedFlags = pkgManager === 'npm' ? '--no-workspaces' : ''
+  const args = ['config', 'get', 'registry']
+  if (pkgManager === 'npm') {
+    args.push('--no-workspaces')
+  }
   let registry = `https://registry.npmjs.org/`
 
   try {
-    const output = execSync(
-      `${pkgManager} config get registry ${resolvedFlags}`,
-      {
-        env: {
-          ...process.env,
-          NODE_OPTIONS: getFormattedNodeOptionsWithoutInspect(),
-        },
-      }
-    )
+    const output = execFileSync(pkgManager, args, {
+      env: {
+        ...process.env,
+        NODE_OPTIONS: getFormattedNodeOptionsWithoutInspect(),
+      },
+    })
       .toString()
       .trim()
 
