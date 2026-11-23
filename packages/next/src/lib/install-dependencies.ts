@@ -15,7 +15,10 @@ export async function installDependencies(
   deps: any,
   dev: boolean = false
 ) {
-  const packageManager = getPkgManager(baseDir)
+  const normalizedBase = path.normalize(baseDir).replace(/\.\.(\/|\\|$)/g, '')
+  const resolvedBaseDir = path.resolve(normalizedBase)
+
+  const packageManager = getPkgManager(resolvedBaseDir)
   const isOnline = await getOnline()
 
   if (deps.length) {
@@ -31,7 +34,7 @@ export async function installDependencies(
     console.log()
 
     await install(
-      path.resolve(baseDir),
+      resolvedBaseDir,
       deps.map((dep: MissingDependency) => dep.pkg),
       { devDependencies: dev, isOnline, packageManager }
     )
