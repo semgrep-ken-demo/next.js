@@ -42,7 +42,15 @@ export async function inlineStaticEnv({
   )
   const changedClientFiles: Array<{ file: string; content: string }> = []
   const filesToCheck = new Set<string>(
-    manifestChunks.map((f) => path.join(distDir, f))
+    manifestChunks.map((f) => {
+      const resolved = path.resolve(distDir, f)
+      if (!resolved.startsWith(distDir + path.sep) && resolved !== distDir) {
+        throw new Error(
+          `Invariant: manifest chunk path escapes dist directory: ${f}`
+        )
+      }
+      return resolved
+    })
   )
 
   for (const [parentDir, files] of [
@@ -52,7 +60,15 @@ export async function inlineStaticEnv({
     await Promise.all(
       files.map(async (file) => {
         await inlineSema.acquire()
-        const filepath = path.join(parentDir, file)
+        const filepath = path.resolve(parentDir, file)
+        if (
+          !filepath.startsWith(parentDir + path.sep) &&
+          filepath !== parentDir
+        ) {
+          throw new Error(
+            `Invariant: chunk path escapes parent directory: ${file}`
+          )
+        }
         const content = await fs.promises.readFile(filepath, 'utf8')
         const newContent = content.replace(builtRegEx, (match) => {
           let normalizedMatch = `process.env.${match.split('.').pop()}`
