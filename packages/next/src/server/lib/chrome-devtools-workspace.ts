@@ -48,7 +48,11 @@ async function getChromeDevtoolsWorkspace(
   configDistDir: string
 ): Promise<ChromeDevtoolsWorkspace> {
   if (workspaceUUID === null) {
-    const distDir = path.join(root, configDistDir)
+    const normalizedDistDir = path.normalize(configDistDir)
+    if (path.isAbsolute(normalizedDistDir) || normalizedDistDir.startsWith('..')) {
+      throw new Error('distDir must be a relative path within the project root')
+    }
+    const distDir = path.join(root, normalizedDistDir)
     const cacheBaseDir = getStorageDirectory(distDir)
 
     if (cacheBaseDir === undefined) {
@@ -58,6 +62,11 @@ async function getChromeDevtoolsWorkspace(
         cacheBaseDir,
         'chrome-devtools-workspace-uuid'
       )
+      const resolvedCachePath = path.resolve(cachedUUIDPath)
+      const resolvedCacheBase = path.resolve(cacheBaseDir)
+      if (!resolvedCachePath.startsWith(resolvedCacheBase + path.sep)) {
+        throw new Error('Unexpected cache path outside of cache directory')
+      }
       try {
         workspaceUUID = await fs.promises.readFile(cachedUUIDPath, 'utf8')
       } catch {
