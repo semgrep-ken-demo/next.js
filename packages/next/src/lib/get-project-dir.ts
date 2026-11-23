@@ -5,7 +5,8 @@ import { realpathSync } from './realpath'
 import { printAndExit } from '../server/lib/utils'
 
 export function getProjectDir(dir?: string, exitOnEnoent = true) {
-  const resolvedDir = path.resolve(dir || '.')
+  const sanitizedDir = path.normalize((dir || '.').replace(/\0/g, ''))
+  const resolvedDir = path.resolve(sanitizedDir)
   try {
     const realDir = realpathSync(resolvedDir)
 
