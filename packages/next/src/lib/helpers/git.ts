@@ -1,7 +1,7 @@
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 
-function gitExec(args: string, cwd: string): string {
-  return execSync(`git ${args}`, {
+function gitExec(args: string[], cwd: string): string {
+  return execFileSync('git', args, {
     cwd,
     timeout: 2000,
     stdio: ['ignore', 'pipe', 'ignore'],
@@ -23,7 +23,7 @@ export function getGitBranch(cwd: string): string | undefined {
     // symbolic-ref --short HEAD: returns the branch name for regular branches,
     // works on repos with no commits, and exits non-zero in detached HEAD state
     // (caught below and treated as unknown).
-    return gitExec('symbolic-ref --short HEAD', cwd)
+    return gitExec(['symbolic-ref', '--short', 'HEAD'], cwd)
   } catch {
     return undefined
   }
@@ -39,7 +39,7 @@ export function getGitCommit(cwd: string): string | undefined {
     return process.env.VERCEL_GIT_COMMIT_SHA
   }
   try {
-    return gitExec('rev-parse HEAD', cwd)
+    return gitExec(['rev-parse', 'HEAD'], cwd)
   } catch {
     return undefined
   }
