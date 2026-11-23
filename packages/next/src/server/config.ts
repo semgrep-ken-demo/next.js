@@ -57,6 +57,35 @@ import type { MemoryEvictionMode } from '../build/swc/types'
 export { normalizeConfig } from './config-shared'
 export type { DomainLocale, NextConfig } from './config-shared'
 
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+function safeResolve(obj: any, dottedKey: string): { found: boolean; value: any } {
+  const keys = dottedKey.split('.')
+  let current = obj
+  for (const key of keys) {
+    if (DANGEROUS_KEYS.has(key)) return { found: false, value: undefined }
+    if (!Object.prototype.hasOwnProperty.call(current, key)) return { found: false, value: undefined }
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
+    current = Reflect.get(current, key)
+  }
+  return { found: true, value: current }
+}
+
+function safeSet(obj: any, dottedKey: string, value: any): void {
+  const keys = dottedKey.split('.')
+  let current = obj
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i]
+    if (DANGEROUS_KEYS.has(key)) return
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
+    Reflect.set(current, key, Reflect.get(current, key) || {})
+    current = Reflect.get(current, key)
+  }
+  const finalKey = keys[keys.length - 1]
+  if (DANGEROUS_KEYS.has(finalKey)) return
+  Reflect.set(current, finalKey, value)
+}
+
 function normalizeNextConfigZodErrors(
   error: ZodError<NextConfig>
 ): [warnings: string[], fatalErrors: string[]] {
@@ -117,17 +146,7 @@ export function warnOptionHasBeenDeprecated(
 ): boolean {
   let hasWarned = false
   if (!silent) {
-    let current = config
-    let found = true
-    const nestedPropertyKeys = nestedPropertyKey.split('.')
-    for (const key of nestedPropertyKeys) {
-      if ((current as any)[key] !== undefined) {
-        current = (current as any)[key]
-      } else {
-        found = false
-        break
-      }
-    }
+    const { found } = safeResolve(config, nestedPropertyKey)
     if (found) {
       Log.warnOnce(reason)
       hasWarned = true
@@ -243,16 +262,11 @@ export function warnOptionHasBeenMovedOutOfExperimental(
       )
     }
 
-    let current = config
-    const newKeys = newKey.split('.')
-    while (newKeys.length > 1) {
-      const key = newKeys.shift()!
-      ;(current as any)[key] = (current as any)[key] || {}
-      current = (current as any)[key]
-    }
-    ;(current as any)[newKeys.shift()!] = (config.experimental as any)[
-      oldExperimentalKey
-    ]
+    safeSet(
+      config,
+      newKey,
+      (config.experimental as any)[oldExperimentalKey]
+    )
   }
 
   return config
@@ -266,18 +280,10 @@ function warnCustomizedOption(
   configFileName: string,
   silent: boolean
 ) {
-  const segs = key.split('.')
-  let current = config
+  const { found, value } = safeResolve(config, key)
+  if (!found) return
 
-  while (segs.length >= 1) {
-    const seg = segs.shift()!
-    if (!(seg in current)) {
-      return
-    }
-    current = (current as any)[seg]
-  }
-
-  if (!silent && current !== defaultValue) {
+  if (!silent && value !== defaultValue) {
     Log.warn(
       `The "${key}" option has been modified. ${customMessage ? customMessage + '. ' : ''}It should be removed from your ${configFileName}.`
     )
