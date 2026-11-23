@@ -3,7 +3,7 @@ import type { CacheHandler } from '../lib/cache-handlers/types'
 
 const debug = process.env.NEXT_PRIVATE_DEBUG_CACHE
   ? (message: string, ...args: any[]) => {
-      console.log(`use-cache: ${message}`, ...args)
+      console.log('use-cache: %s', message, ...args)
     }
   : undefined
 
