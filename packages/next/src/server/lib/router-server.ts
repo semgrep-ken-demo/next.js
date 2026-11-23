@@ -65,6 +65,10 @@ const debug = setupDebug('next:router-server:main')
 const isNextFont = (pathname: string | null) =>
   pathname && /\/media\/[^/]+\.(woff|woff2|eot|ttf|otf)$/.test(pathname)
 
+function sanitizePath(value: string): string {
+  return value.replace(/\.\.[/\\]/g, '')
+}
+
 export type RenderServer = Pick<
   typeof import('./render-server'),
   | 'initialize'
@@ -143,7 +147,7 @@ export async function initialize(opts: {
       require('../../telemetry/storage') as typeof import('../../telemetry/storage')
 
     const telemetry = new Telemetry({
-      distDir: path.join(opts.dir, config.distDir),
+      distDir: path.join(sanitizePath(opts.dir), sanitizePath(config.distDir)),
     })
     traceGlobals.set('telemetry', telemetry)
 
