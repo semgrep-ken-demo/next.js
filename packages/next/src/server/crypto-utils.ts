@@ -24,7 +24,9 @@ export function encryptWithSecret(secret: Buffer, data: string): string {
     `sha512`
   )
 
-  const cipher = crypto.createCipheriv(CIPHER_ALGORITHM, key, iv)
+  const cipher = crypto.createCipheriv(CIPHER_ALGORITHM, key, iv, {
+    authTagLength: CIPHER_TAG_LENGTH,
+  })
   const encrypted = Buffer.concat([cipher.update(data, `utf8`), cipher.final()])
 
   // https://nodejs.org/api/crypto.html#crypto_cipher_getauthtag
@@ -70,7 +72,9 @@ export function decryptWithSecret(
     `sha512`
   )
 
-  const decipher = crypto.createDecipheriv(CIPHER_ALGORITHM, key, iv)
+  const decipher = crypto.createDecipheriv(CIPHER_ALGORITHM, key, iv, {
+    authTagLength: CIPHER_TAG_LENGTH,
+  })
   decipher.setAuthTag(tag)
 
   return decipher.update(encrypted) + decipher.final(`utf8`)
