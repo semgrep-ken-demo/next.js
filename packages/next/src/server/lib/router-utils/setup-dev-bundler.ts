@@ -190,6 +190,16 @@ async function startWatcher(
   const { useFileSystemPublicRoutes } = nextConfig
 
   const distDir = path.join(opts.dir, opts.nextConfig.distDir)
+  const resolvedDistDir = path.resolve(distDir)
+  const resolvedDir = path.resolve(opts.dir)
+  if (
+    resolvedDistDir !== resolvedDir &&
+    !resolvedDistDir.startsWith(resolvedDir + path.sep)
+  ) {
+    throw new Error(
+      `Invalid distDir "${opts.nextConfig.distDir}" — the output directory must be inside the project root.`
+    )
+  }
 
   setGlobal('distDir', distDir)
   setGlobal('phase', PHASE_DEVELOPMENT_SERVER)
