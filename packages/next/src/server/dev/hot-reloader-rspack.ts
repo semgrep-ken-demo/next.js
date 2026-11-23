@@ -43,7 +43,7 @@ export default class HotReloaderRspack extends HotReloaderWebpack {
       'rspack-after-compile'
     )
     await rspackStartSpan.traceAsyncFn(async () => {
-      const hash = createHash('sha1')
+      const hash = createHash('sha256')
       multiCompiler.compilers.forEach((compiler) => {
         const cache = compiler.options.cache
         if (typeof cache === 'object' && 'version' in cache && cache.version) {
