@@ -197,6 +197,42 @@ function readJsonFile<T>(filePath: string): T | null {
   }
 }
 
+function sanitizePath(p: string): string {
+  if (p.includes('\0') || path.isAbsolute(p)) {
+    throw new Error(`Invalid path in build output: ${p}`)
+  }
+  return p
+}
+
+function validateManifestEntry(p: string): string {
+  sanitizePath(p)
+  const normalized = path.normalize(p)
+  if (normalized.startsWith('..')) {
+    throw new Error(`Path traversal in build manifest entry: ${p}`)
+  }
+  return normalized
+}
+
+function safeJoin(base: string, ...segments: string[]): string {
+  const joined = path.join(base, ...segments)
+  const resolvedBase = path.resolve(base)
+  const resolvedJoined = path.resolve(joined)
+  if (
+    resolvedJoined !== resolvedBase &&
+    !resolvedJoined.startsWith(resolvedBase + path.sep)
+  ) {
+    throw new Error(
+      `Path traversal detected: resolved path escapes ${resolvedBase}`
+    )
+  }
+  return joined
+}
+
+function safeResolve(base: string, segment: string): string {
+  sanitizePath(segment)
+  return path.resolve(base, segment)
+}
+
 interface MiddlewareManifestEntry {
   files: string[]
   page?: string
@@ -210,7 +246,7 @@ interface MiddlewareManifest {
 
 function discoverRoutes(distDir: string): RouteEntry[] {
   const middlewareManifest = readJsonFile<MiddlewareManifest>(
-    path.join(distDir, 'server', 'middleware-manifest.json')
+    safeJoin(distDir, 'server', 'middleware-manifest.json')
   )
   // Edge route handlers (per-route runtime: 'edge') live in `functions`.
   // Their key matches either an app-paths-manifest internal key (e.g.
@@ -232,7 +268,7 @@ function discoverPagesRoutes(
   edgeFunctions: Record<string, MiddlewareManifestEntry>
 ): RouteEntry[] {
   const manifest = readJsonFile<Record<string, string>>(
-    path.join(distDir, 'server', 'pages-manifest.json')
+    safeJoin(distDir, 'server', 'pages-manifest.json')
   )
   if (!manifest) return []
 
@@ -268,14 +304,14 @@ function discoverAppRoutes(
   edgeFunctions: Record<string, MiddlewareManifestEntry>
 ): RouteEntry[] {
   const appPathsManifest = readJsonFile<Record<string, string>>(
-    path.join(distDir, 'server', 'app-paths-manifest.json')
+    safeJoin(distDir, 'server', 'app-paths-manifest.json')
   )
   if (!appPathsManifest) return []
 
   // Maps internal entry keys (e.g. "/blog/[slug]/page") to their URL path
   // ("/blog/[slug]"). Optional — falls back to the internal key if missing.
   const appPathRoutesManifest = readJsonFile<Record<string, string>>(
-    path.join(distDir, 'app-path-routes-manifest.json')
+    safeJoin(distDir, 'app-path-routes-manifest.json')
   )
 
   const routes: RouteEntry[] = []
@@ -346,19 +382,21 @@ function collectServerEntryFiles(
   serverEntry: string,
   sets: FileSets
 ): void {
-  const entryRel = path.join('server', serverEntry) // e.g. server/app/page.js
+  const sanitizedEntry = validateManifestEntry(serverEntry)
+  const entryRel = safeJoin('server', sanitizedEntry) // e.g. server/app/page.js
   const entryDirRel = path.dirname(entryRel) // e.g. server/app
-  const entryDirAbs = path.join(distDir, entryDirRel)
+  const entryDirAbs = safeJoin(distDir, entryDirRel)
 
   // The entry .js is always part of the bundle, even if no nft.json exists.
   sets.serverBundled.add(entryRel)
 
   const nft = readJsonFile<{ files: string[] }>(
-    path.join(distDir, entryRel + '.nft.json')
+    safeJoin(distDir, entryRel + '.nft.json')
   )
   if (!nft?.files) return
 
   for (const relPath of nft.files) {
+    sanitizePath(relPath)
     // Resolve relative to the entry's dir. If the normalized result stays
     // inside distDir it's a server chunk; if it leaves distDir it's an
     // unbundled trace dep (e.g. ../../../node_modules/...).
@@ -369,10 +407,10 @@ function collectServerEntryFiles(
       // Source maps go into the maps category whether they're in or outside
       // distDir, so they don't double-count under serverUnbundled.
       sets.serverMaps.add(
-        outsideDistDir ? path.resolve(entryDirAbs, relPath) : inDistDirPath
+        outsideDistDir ? safeResolve(entryDirAbs, relPath) : inDistDirPath
       )
     } else if (outsideDistDir) {
-      sets.serverUnbundled.add(path.resolve(entryDirAbs, relPath))
+      sets.serverUnbundled.add(safeResolve(entryDirAbs, relPath))
     } else if (
       inDistDirPath.endsWith('.js') &&
       !inDistDirPath.endsWith('_client-reference-manifest.js')
@@ -563,12 +601,13 @@ function collectAppClientFiles(
   serverEntry: string,
   sets: FileSets
 ): void {
-  const entryDir = path.dirname(serverEntry)
-  const entryBase = path.basename(serverEntry, '.js')
-  const baseDir = path.join(distDir, 'server', entryDir)
+  const sanitizedEntry = validateManifestEntry(serverEntry)
+  const entryDir = path.dirname(sanitizedEntry)
+  const entryBase = path.basename(sanitizedEntry, '.js')
+  const baseDir = safeJoin(distDir, 'server', entryDir)
 
   const crm = parseClientReferenceManifest(
-    path.join(baseDir, `${entryBase}_client-reference-manifest.js`)
+    safeJoin(baseDir, `${entryBase}_client-reference-manifest.js`)
   )
   if (crm) {
     if (crm.entryJSFiles) {
