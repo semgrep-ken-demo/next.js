@@ -129,7 +129,7 @@ export class AppPageRouteModule extends RouteModule<
       // Mark the request as a router prefetch request.
       req.headers[RSC_HEADER] = '1'
       req.headers[NEXT_ROUTER_PREFETCH_HEADER] = '1'
-      req.headers[NEXT_ROUTER_SEGMENT_PREFETCH_HEADER] = segmentPath
+      req.headers['next-router-segment-prefetch'] = segmentPath
 
       addRequestMeta(req, 'isRSCRequest', true)
       addRequestMeta(req, 'isPrefetchRSCRequest', true)
