@@ -104,7 +104,8 @@ export function validateTags(tags: any[], description: string) {
 
     if (validTags.length > NEXT_CACHE_TAG_MAX_ITEMS) {
       console.warn(
-        `Warning: exceeded max tag count for ${description}, dropped tags:`,
+        'Warning: exceeded max tag count for %s, dropped tags: %s',
+        description,
         tags.slice(i).join(', ')
       )
       break
@@ -112,7 +113,7 @@ export function validateTags(tags: any[], description: string) {
   }
 
   if (invalidTags.length > 0) {
-    console.warn(`Warning: invalid tags passed to ${description}: `)
+    console.warn('Warning: invalid tags passed to %s: ', description)
 
     for (const { tag, reason } of invalidTags) {
       console.log(`tag: "${tag}" ${reason}`)
