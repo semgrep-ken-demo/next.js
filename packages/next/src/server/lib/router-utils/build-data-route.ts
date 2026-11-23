@@ -10,6 +10,7 @@ export function buildDataRoute(page: string, buildId: string) {
   const dataRoute = path.posix.join('/_next/data', buildId, `${pagePath}.json`)
 
   let dataRouteRegex: string
+  let dataRouteRe: RegExp
   let namedDataRouteRegex: string | undefined
   let routeKeys: { [named: string]: string } | undefined
 
@@ -21,24 +22,35 @@ export function buildDataRoute(page: string, buildId: string) {
     })
 
     dataRouteRegex = normalizeRouteRegex(routeRegex.re.source)
+    dataRouteRe = routeRegex.re
     namedDataRouteRegex = routeRegex.namedRegex
     routeKeys = routeRegex.routeKeys
   } else {
-    dataRouteRegex = normalizeRouteRegex(
-      new RegExp(
-        `^${path.posix.join(
-          '/_next/data',
-          escapeStringRegexp(buildId),
-          `${pagePath}\\.json`
-        )}$`
-      ).source
+    const re = new RegExp(
+      `^${path.posix.join(
+        '/_next/data',
+        escapeStringRegexp(buildId),
+        `${pagePath}\\.json`
+      )}$`
     )
+    dataRouteRegex = normalizeRouteRegex(re.source)
+    dataRouteRe = re
   }
+
+  const escapedBuildId = escapeStringRegexp(buildId)
+  const i18nDataRouteRe = new RegExp(
+    dataRouteRegex.replace(
+      `/${escapedBuildId}/`,
+      `/${escapedBuildId}/(?<nextLocale>[^/]+?)/`
+    )
+  )
 
   return {
     page,
     routeKeys,
     dataRouteRegex,
+    dataRouteRe,
+    i18nDataRouteRe,
     namedDataRouteRegex,
   }
 }
