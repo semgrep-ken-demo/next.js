@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     io::Write,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::{Arc, LazyLock},
     thread,
     time::Duration,
@@ -462,10 +462,28 @@ pub fn project_new(
                     .join(path)
             }
         } else {
-            PathBuf::from(&options.root_path)
-                .join(&options.project_path)
+            let root = PathBuf::from(&options.root_path);
+            let joined = root.join(&options.project_path);
+            let normalized = joined
+                .components()
+                .fold(PathBuf::new(), |mut acc, comp| {
+                    match comp {
+                        Component::ParentDir => {
+                            acc.pop();
+                        }
+                        Component::CurDir => {}
+                        _ => acc.push(comp),
+                    }
+                    acc
+                });
+            assert!(
+                normalized.starts_with(&root),
+                "project_path escapes root_path: {:?} is not under {:?}",
+                options.project_path,
+                options.root_path,
+            );
+            normalized
                 .join(DIST_PROFILES_DIR_NAME)
-                // use a generic binary extension to hint to random tools not to read it.
                 .join("trace-turbopack.bin")
         };
         let trace_dir = trace_file
